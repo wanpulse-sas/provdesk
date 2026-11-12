@@ -1,11 +1,11 @@
 # ProVDesk desktop builds
 
-Modified from RustDesk by WanPulse on 2026-10-06. The functional changes are the
+Modified from RustDesk by WanPulse SAS on 2026-10-06. The functional changes are the
 ProVDesk application name and enforced WebSocket transport. The original
 copyright notices and AGPL-3.0 license in LICENCE are retained; the license and
 its warranty disclaimer apply to this modified version.
 
-Public source: https://github.com/wanpulse-sas/proVDesk
+Public source: https://github.com/wanpulse-sas/provdesk
 The ProVDesk About page offers this source link.
 
 Current client builds register and accept only provdesk://. The shared rustdesk://
@@ -40,6 +40,34 @@ artifacts/ProVDesk/ProVDesk.exe together with LICENCE and this notice.
 folder, including its DLLs and data. The script preserves the caller's build
 environment and restores Runner.rc after building.
 
+## Signed Windows CI build
+
+Sources and CI are versioned together. Bitbucket builds its selected checkout
+commit on the Windows runner using the WanPulse SAS signing framework.
+See [the English CI guide](ci/README.md) or
+[the French CI guide](ci/README.fr.md) for tool versions, runner configuration,
+required variables and detailed checks.
+
+A push to `master` automatically starts the build and signing pipeline, followed
+by GitHub release publication and SMB publication. The same step can be started
+manually as `provdesk-build-sign-package` on any branch. Only `master` publishes;
+other branches retain signed Bitbucket artifacts without GitHub or SMB publication.
+There is no publication parameter. GitHub and SMB preflight checks run only on `master`.
+
+The GitHub release contains `ProVDesk-<version>-windows-x86_64.exe`, its `.sha256`
+and `build.json`. Renaming preserves the signed executable bytes.
+Its tag, `provdesk-<version>-build.<number>`, points to the exact built commit.
+The pipeline verifies the signed installer and uploaded asset hashes before
+publishing the draft release; it then publishes the same installer to SMB.
+
+CI signs the payload EXE and DLLs before packaging, preserves and verifies valid
+third-party signatures and catalog-covered driver files, then signs the final
+self-extracting installer. Embedded files are checked against the signed payload.
+Artifacts include `out/ProVDesk.exe`, its SHA-256, `build.json`, signature reports
+and the signed payload archive. Verify signatures, hashes and the source commit,
+then test installation and runtime behavior in a VM before distribution.
+This CI covers Windows x64; it does not build the macOS packages described below.
+
 ## Before distributing binaries
 
 Publish the exact matching modified source commit/tag to the public fork,
@@ -49,7 +77,7 @@ alongside the binary. Update the About source URL to the matching release tag
 when publishing a release. A local review build must not be represented as a
 published-source release before those changes are publicly accessible.
 
-Upstream source baseline: 9f9585ce155a6558f0625eaf8fabfe8827c9a552 (RustDesk 1.5.0).
+Upstream source baseline: fada664df7a294d1d1a9ca3e7cd3637069122f17 (official RustDesk 1.5.0 tag).
 Pinned hbb_common submodule: 229b904508364c8997aad0fb5af57effac859f60.
 Review build toolchain: Rust 1.91.1, Flutter 3.24.5, Python 3.13, MSVC x64.
 
@@ -168,8 +196,8 @@ the right panel and retains status on the left; install_page.dart hides the
 portable-run action. Other application names keep their existing UI.
 
 Build with the Windows script; its standalone output is
-artifacts/ProVDesk/ProVDesk.exe. Sign the payload before packaging and the final
-installer afterwards, then publish the matching sources with the binary.
+artifacts/ProVDesk/ProVDesk.exe. For a signed delivery, use the Windows CI
+pipeline above and publish the matching sources with the binary.
 
 ## Configured-server review (2026-11-05)
 
@@ -178,7 +206,8 @@ ID server it neither selects the built-in public rendezvous servers nor reuses
 cached rendezvous addresses; a configured custom server is used normally. The
 implicit public API fallback is also disabled. Incoming and outgoing modes are
 unchanged, including explicitly supplied server addresses in connection links.
-The Windows publisher and EXE company metadata default to WanPulse. The signer
+The project is presented as ProVDesk by WanPulse SAS. The Windows publisher and
+EXE company metadata remain WanPulse, as in proVconnect. The signer
 shown by Windows after signing depends on the signing certificate.
 
 Regression surface: desktop_home_page.dart hides status for ProVDesk only; the
