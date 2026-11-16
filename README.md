@@ -44,6 +44,8 @@ Publication depends only on the branch; no publication parameter is required.
 
 GitHub releases contain `ProVdesk-<version>-windows-x86_64.exe`, its `.sha256` and `build.json`,
 with a `provdesk-<version>-build.<number>` tag pointing to the built commit.
+`THIRD-PARTY.txt` supplies the additional notices and MPL component source locations;
+existing Flutter and driver notices remain in their original locations.
 GitHub and SMB preflight checks run only on `master`. GitHub publication also requires
 GitHub CLI and an organization-owned GitHub App with a secured private key;
 CI generates temporary installation tokens. See the CI guide. Upstream GitHub Actions

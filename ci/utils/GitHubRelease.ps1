@@ -66,12 +66,17 @@ function Publish-SignedGitHubRelease([string]$OutputDirectory) {
     }
     Set-Content -LiteralPath "$releaseExe.sha256" -Value "$hash  $assetName" -Encoding ASCII
     $files = @($releaseExe, "$releaseExe.sha256", "$OutputDirectory/build.json")
+    $notices = Join-Path $OutputDirectory 'THIRD-PARTY.txt'
+    if (-not (Test-Path -LiteralPath $notices -PathType Leaf)) { throw 'Missing third-party notices.' }
+    $files += $notices
     $notes = @"
 ## Downloads
 
 | Architecture | Windows |
 | --- | --- |
 | x86-64 (64-bit) | [Signed EXE](https://github.com/$repository/releases/download/$tag/$assetName) |
+
+[Third-party notices and component sources](https://github.com/$repository/releases/download/$tag/THIRD-PARTY.txt)
 
 ## ProVdesk
 

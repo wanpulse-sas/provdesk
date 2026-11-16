@@ -44,5 +44,7 @@ foreach ($required in @('ProVdesk.exe', 'librustdesk.dll', 'flutter_windows.dll'
     if (-not (Test-Path -LiteralPath (Join-Path $payload $required) -PathType Leaf)) { throw "Payload incomplet : $required" }
 }
 if (-not (Test-Path -LiteralPath "$payload/data/flutter_assets" -PathType Container)) { throw 'Assets Flutter absents.' }
+python "$root/ci/Collect-Legal.py" $root
+Assert-NativeSuccess 'Add missing third-party notices'
 $beforeSigning = @(Get-PayloadManifest)
 ConvertTo-Json -InputObject $beforeSigning -Depth 4 | Set-Content "$work/payload-unsigned.json" -Encoding UTF8

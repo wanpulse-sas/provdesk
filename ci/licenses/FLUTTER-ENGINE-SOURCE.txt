@@ -1,0 +1,38 @@
+Sources of the Windows Flutter engine used by ProVdesk
+
+The upstream RustDesk engine archive is locked by SHA-256 in
+ci/dependencies.json. It is reused without changing its executable code.
+Its Flutter engine revision is a18df97ca57a249df5d8d68cd0820600223ce262
+(Flutter SDK 3.24.5). The corresponding sources and dependency revisions are:
+
+https://github.com/flutter/engine/tree/a18df97ca57a249df5d8d68cd0820600223ce262
+https://github.com/flutter/engine/blob/a18df97ca57a249df5d8d68cd0820600223ce262/DEPS
+https://github.com/dart-lang/sdk/tree/88c9758ef131d430d8ce595c6bfb4c90574d3ddd
+
+RustDesk's Windows recipe, prerequisites, engine edits and build commands:
+https://github.com/rustdesk/engine/blob/005f9e43db275a61e71b602800c65d653c44be45/.github/workflows/flutter-engine-windows-x64-release-build.yml
+
+Fetch the engine and its dependencies with Chromium depot_tools, using
+a .gclient file containing:
+
+solutions = [{"name": "src/flutter", "url": "https://github.com/flutter/engine.git", "deps_file": "DEPS", "managed": False, "custom_deps": {}, "custom_vars": {}}]
+
+gclient sync --revision src/flutter@a18df97ca57a249df5d8d68cd0820600223ce262 --nohooks
+
+Apply the recipe's two engine edits: replace ClearCurrent with MakeCurrent
+in shell/platform/windows/flutter_windows_engine.cc, and add #include <string>
+before #include <string_view> in fml/hex_codec.h.
+
+Apply these pinned Dart patches inside src/flutter/third_party/dart:
+https://dart-review.googlesource.com/changes/sdk~320620/revisions/2/patch?zip&path=runtime%2Fbin%2Fplatform_win.cc
+https://raw.githubusercontent.com/rustdesk/engine/005f9e43db275a61e71b602800c65d653c44be45/0001-Revert-win-unwinding-Remove-Windows7-handling-of-unw.patch
+https://raw.githubusercontent.com/rustdesk/engine/005f9e43db275a61e71b602800c65d653c44be45/0001-revert-file_win.cc.patch
+
+For the first URL, extract the ZIP and apply its 987dbe0.diff with git apply.
+Then follow the compilation commands in the pinned RustDesk recipe above.
+WanPulse signing credentials are not required to retrieve or compile sources.
+The application sources, lockfiles and CI patches are in the corresponding
+ProVdesk release commit; initialize its Git submodules recursively.
+
+Flutter, Dart and engine dependency notices remain in
+data/flutter_assets/NOTICES.Z, accessible through the application's licenses UI.

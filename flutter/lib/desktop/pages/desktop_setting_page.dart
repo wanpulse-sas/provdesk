@@ -2576,6 +2576,26 @@ class _AboutState extends State<_About> {
                     child: const Text('ProVdesk source (AGPL-3.0)',
                             style: linkStyle)
                         .marginSymmetric(vertical: 4.0)),
+              if (appName == 'ProVdesk' && isWindows)
+                InkWell(
+                    onTap: () {
+                      showLicensePage(
+                          context: context, applicationName: appName);
+                    },
+                    child: const Text('Flutter and plugin licenses',
+                            style: linkStyle)
+                        .marginSymmetric(vertical: 4.0)),
+              if (appName == 'ProVdesk' && isWindows)
+                InkWell(
+                    onTap: () {
+                      launchUrl(File(Platform.resolvedExecutable)
+                          .parent
+                          .uri
+                          .resolve('THIRD-PARTY.txt'));
+                    },
+                    child: const Text('Additional notices and sources',
+                            style: linkStyle)
+                        .marginSymmetric(vertical: 4.0)),
               Container(
                 decoration: const BoxDecoration(color: Color(0xFF2c8cff)),
                 padding:

@@ -46,7 +46,7 @@ python -m venv "$root/build-tools/python"
 Assert-NativeSuccess 'Environnement Python'
 & "$root/build-tools/python/Scripts/python.exe" -m pip install --only-binary=:all: brotli==1.2.1
 Assert-NativeSuccess 'Brotli'
-& "$root/build-tools/python/Scripts/python.exe" -m unittest discover -s "$root/ci/tests" -p test_package.py
+& "$root/build-tools/python/Scripts/python.exe" -m unittest discover -s "$root/ci/tests" -p 'test_*.py'
 Assert-NativeSuccess 'Package regression tests'
 & "$root/build-tools/python/Scripts/python.exe" "$root/ci/tests/Test-ForkPackage.py" "$root/libs/portable/generate.py"
 Assert-NativeSuccess 'Pinned fork package producer/consumer test'

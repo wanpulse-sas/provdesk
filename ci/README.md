@@ -312,7 +312,13 @@ A draft release receives only:
 
 - `ProVdesk-<version>-windows-x86_64.exe`: the same signed bytes as `out/ProVdesk.exe`;
 - its `.sha256` file, referring to the versioned asset name;
-- `build.json`: build and signature provenance.
+- `build.json`: build and signature provenance;
+- `THIRD-PARTY.txt`: missing component notices and corresponding source locations,
+  including the native libraries and the custom Flutter engine recipe.
+
+The same text is included in the application before signing. Existing Flutter,
+Amyuni and WindowInjection notices are retained without duplication. This step
+reads versioned files only; it does not download or archive dependency sources.
 
 Release notes include a Windows x64 download table, ProVdesk characteristics,
 the product version, build number, source link and installer hash. GitHub also

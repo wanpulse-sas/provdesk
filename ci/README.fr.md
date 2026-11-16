@@ -324,7 +324,13 @@ Une release brouillon reçoit uniquement :
 
 - `ProVdesk-<version>-windows-x86_64.exe` : les mêmes octets signés que `out/ProVdesk.exe` ;
 - son fichier `.sha256`, qui utilise le nom versionné de l'artefact ;
-- `build.json` : traçabilité du build et de la signature.
+- `build.json` : traçabilité du build et de la signature ;
+- `THIRD-PARTY.txt` : notices manquantes des composants et accès aux sources,
+  y compris les bibliothèques natives et la recette du moteur Flutter adapté.
+
+Le même texte est inclus dans l’application avant signature. Les notices Flutter,
+Amyuni et WindowInjection existantes sont conservées sans duplication. Cette étape
+lit uniquement les fichiers versionnés ; elle ne télécharge ni n’archive les sources des dépendances.
 
 Les notes présentent le téléchargement Windows x64, les caractéristiques ProVdesk,
 la version produit, le numéro de build, les sources et le hash de l'installateur.
