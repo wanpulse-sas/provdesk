@@ -1716,21 +1716,13 @@ fn cm_inner_send(id: i32, data: Data) {
 
 pub fn can_elevate() -> bool {
     #[cfg(windows)]
-    return !crate::platform::is_installed();
+    return crate::portable_service::ELEVATION_SUPPORTED;
     #[cfg(not(windows))]
     return false;
 }
 
 pub fn elevate_portable(_id: i32) {
-    #[cfg(windows)]
-    {
-        let lock = CLIENTS.read().unwrap();
-        if let Some(s) = lock.get(&_id) {
-            allow_err!(s.tx.send(ipc::Data::DataPortableService(
-                ipc::DataPortableService::RequestStart
-            )));
-        }
-    }
+    log::error!("Portable elevation is not available in ProVdesk; install the application instead");
 }
 
 #[cfg(any(target_os = "android", target_os = "ios", feature = "flutter"))]

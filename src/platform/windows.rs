@@ -2429,85 +2429,8 @@ pub fn elevate(arg: &str) -> ResultType<bool> {
     )
 }
 
-pub fn run_as_system(arg: &str) -> ResultType<()> {
-    let exe = std::env::current_exe()?.to_string_lossy().to_string();
-    if impersonate_system::run_as_system(&exe, arg).is_err() {
-        bail!(format!("Failed to run {} as system", exe));
-    }
-    Ok(())
-}
-
-pub fn elevate_or_run_as_system(is_setup: bool, is_elevate: bool, is_run_as_system: bool) {
-    // avoid possible run recursively due to failed run.
-    log::info!(
-        "elevate: {} -> {:?}, run_as_system: {} -> {}",
-        is_elevate,
-        is_elevated(None),
-        is_run_as_system,
-        crate::username(),
-    );
-    let mut arg_elevate = if is_setup {
-        "--noinstall --elevate"
-    } else {
-        "--elevate"
-    }
-    .to_owned();
-    let mut arg_run_as_system = if is_setup {
-        "--noinstall --run-as-system"
-    } else {
-        "--run-as-system"
-    }
-    .to_owned();
-    let shmem_name_from_args = crate::portable_service::portable_service_shmem_name_from_args();
-    if shmem_name_from_args.is_none() && crate::portable_service::has_portable_service_shmem_arg() {
-        log::error!("Invalid portable service shared memory argument, aborting elevation flow");
-        // This is a malformed bootstrap argument in a privilege-sensitive path.
-        // Keep fail-closed process termination here to avoid continuing elevation
-        // with inconsistent shared-memory contract.
-        std::process::exit(1);
-    }
-    if let Some(shmem_name) = shmem_name_from_args {
-        let shmem_arg = crate::portable_service::portable_service_shmem_arg(&shmem_name);
-        arg_elevate.push(' ');
-        arg_elevate.push_str(&shmem_arg);
-        arg_run_as_system.push(' ');
-        arg_run_as_system.push_str(&shmem_arg);
-    }
-    if is_root() {
-        if is_run_as_system {
-            log::info!("run portable service");
-            crate::portable_service::server::run_portable_service();
-        }
-    } else {
-        match is_elevated(None) {
-            Ok(elevated) => {
-                if elevated {
-                    if !is_run_as_system {
-                        if run_as_system(arg_run_as_system.as_str()).is_ok() {
-                            std::process::exit(0);
-                        } else {
-                            log::error!(
-                                "Failed to run as system, error {}",
-                                io::Error::last_os_error()
-                            );
-                        }
-                    }
-                } else {
-                    if !is_elevate {
-                        if let Ok(true) = elevate(arg_elevate.as_str()) {
-                            std::process::exit(0);
-                        } else {
-                            log::error!("Failed to elevate, error {}", io::Error::last_os_error());
-                        }
-                    }
-                }
-            }
-            Err(_) => log::error!(
-                "Failed to get elevation status, error {}",
-                io::Error::last_os_error()
-            ),
-        }
-    }
+pub fn elevate_or_run_as_system(_is_setup: bool, _is_elevate: bool, _is_run_as_system: bool) {
+    log::error!("Portable elevation is not available in ProVdesk; install the application instead");
 }
 
 pub fn is_elevated(process_id: Option<DWORD>) -> ResultType<bool> {

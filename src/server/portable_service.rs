@@ -56,6 +56,7 @@ const MIN_RUNTIME_SHMEM_LEN: usize = ADDR_CAPTURE_FRAME + FRAME_ALIGN;
 
 const IPC_SUFFIX: &str = "_portable_service";
 pub const SHMEM_NAME: &str = "_portable_service";
+pub const ELEVATION_SUPPORTED: bool = false;
 pub const SHMEM_ARG_PREFIX: &str = "--portable-service-shmem-name=";
 const SHMEM_PARENT_DIR: &str = "portable_service_shmem";
 const SHMEM_NAME_MAX_LEN: usize = 64;
@@ -995,6 +996,9 @@ pub mod client {
     // 2) Start helper process (direct or logon) with shmem argument.
     // 3) Keep STARTING=true until IPC ping/pong marks RUNNING, or timeout watchdog resets it.
     pub(crate) fn start_portable_service(para: StartPara) -> ResultType<()> {
+        if !super::ELEVATION_SUPPORTED {
+            bail!("Portable elevation is not available in ProVdesk; install the application instead");
+        }
         log::info!("start portable service");
         let launch_token = {
             // Keep lock guards in explicit short scopes to make it obvious
@@ -1594,7 +1598,18 @@ pub struct FrameInfo {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_valid_capture_frame_length, ADDR_CAPTURE_FRAME};
+    use super::{client, is_valid_capture_frame_length, ADDR_CAPTURE_FRAME};
+
+    #[test]
+    fn portable_elevation_rejects_direct_and_logon_requests() {
+        for request in [
+            client::StartPara::Direct,
+            client::StartPara::Logon("unused".into(), "unused".into()),
+        ] {
+            let error = client::start_portable_service(request).unwrap_err();
+            assert!(error.to_string().contains("Portable elevation is not available"));
+        }
+    }
 
     #[test]
     fn test_is_valid_capture_frame_length_rejects_zero_length() {

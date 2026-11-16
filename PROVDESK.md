@@ -11,6 +11,12 @@ The ProVdesk About page offers this source link.
 Current client builds register and accept only provdesk://. The shared rustdesk://
 registration described in the historical notes below has been removed.
 
+## Windows portable elevation
+
+ProVdesk requires installation for normal use. Portable SYSTEM elevation is
+not available, and the `impersonate_system` dependency is excluded. The installed
+Windows service and administrator elevation for installation remain unchanged.
+
 ## Network configuration
 
 WebSocket is enforced by the ProVdesk build. ID/rendezvous server, relay server,
