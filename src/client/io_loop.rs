@@ -804,6 +804,9 @@ impl<T: InvokeUiSession> Remote<T> {
                 allow_err!(peer.send(&msg).await);
             }
             Data::SendFiles((id, r#type, path, to, file_num, include_hidden, is_remote)) => {
+                if r#type == fs::JobType::Printer {
+                    return true;
+                }
                 log::info!("send files, is remote {}", is_remote);
                 let od = can_enable_overwrite_detection(self.handler.lc.read().unwrap().version);
                 if is_remote {
@@ -2257,32 +2260,12 @@ impl<T: InvokeUiSession> Remote<T> {
                     Some(file_action::Union::Send(_s)) => match _s.file_type.enum_value() {
                         #[cfg(target_os = "windows")]
                         Ok(file_transfer_send_request::FileType::Printer) => {
-                            #[cfg(feature = "flutter")]
-                            let action =
-                                LocalConfig::get_option(keys::OPTION_PRINTER_INCOMING_JOB_ACTION);
-                            #[cfg(not(feature = "flutter"))]
-                            let action = "";
-                            if action == "dismiss" {
-                                // Just ignore the incoming print job.
-                            } else {
-                                let id = fs::get_next_job_id();
-                                #[cfg(feature = "flutter")]
-                                let allow_auto_print = LocalConfig::get_bool_option(
-                                    keys::OPTION_PRINTER_ALLOW_AUTO_PRINT,
-                                );
-                                #[cfg(not(feature = "flutter"))]
-                                let allow_auto_print = false;
-                                if allow_auto_print {
-                                    let printer_name = if action == "" {
-                                        "".to_string()
-                                    } else {
-                                        LocalConfig::get_option(keys::OPTION_PRINTER_SELECTED_NAME)
-                                    };
-                                    self.handler.printer_response(id, _s.path, printer_name);
-                                } else {
-                                    self.handler.printer_request(id, _s.path);
-                                }
-                            }
+                            self.handler.msgbox(
+                                "custom-error",
+                                "Remote printing",
+                                "Remote printing is not available in ProVdesk",
+                                "",
+                            );
                         }
                         _ => {}
                     },

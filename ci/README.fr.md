@@ -33,7 +33,7 @@ La configuration et les patches sont versionnés avec les sources du produit.
 | Bridge | Régénération par le script ProVdesk avec codegen 1.80.1, sans réutiliser l'artefact GitHub généré sous un autre SDK |
 | vcpkg | Baseline du manifeste, overlays du fork, triplet x64-windows-static et installation explicite |
 | Utilitaire | Compilation de WindowInjection.dll au commit ecd8d6a139eee76845ea66423fb739af450fda90, licence incluse |
-| Affichage / impression | Ajout des paquets du workflow, sans suppression silencieuse en cas d'échec |
+| Affichage | Pilote Amyuni conservé avec contrôle de son catalogue. Les composants d’impression distante sont exclus et leur présence dans le payload provoque un échec. |
 | Wrapper | Adaptation DPI identique au workflow ; branding du build.rs ProVdesk conservé |
 | Updater / désinstallation | Implémentés dans le client (`src/updater.rs`, argument `--uninstall` dans `src/core_main.rs`) ; pas d'EXE autonome construit par ce workflow. Les EXE/DLL supplémentaires présents sont inventoriés récursivement |
 

@@ -1357,21 +1357,8 @@ pub fn get_install_options() -> String {
     serde_json::to_string(&opts).unwrap_or("{}".to_owned())
 }
 
-pub fn get_silent_install_options(printer_override: Option<bool>) -> &'static str {
-    let install_printer = match printer_override {
-        Some(override_value) => override_value,
-        None => {
-            let app_name = crate::get_app_name();
-            let subkey = format!(".{}", app_name.to_lowercase());
-            let printer = get_reg_of_hkcr(&subkey, REG_NAME_INSTALL_PRINTER);
-            printer.as_deref() == Some("1")
-        }
-    };
-    if install_printer && is_win_10_or_greater() {
-        "desktopicon startmenu printer"
-    } else {
-        "desktopicon startmenu"
-    }
+pub fn get_silent_install_options(_printer_override: Option<bool>) -> &'static str {
+    "desktopicon startmenu"
 }
 
 // This function return Option<String>, because some registry value may be empty.
@@ -1672,7 +1659,7 @@ pub fn install_me(options: &str, path: String, silent: bool, debug: bool) -> Res
         embedded_tray_shortcut_commands(&app_name, &exe, shortcut_icon_location.as_deref())?;
     let mut reg_value_desktop_shortcuts = "0".to_owned();
     let mut reg_value_start_menu_shortcuts = "0".to_owned();
-    let mut reg_value_printer = "0".to_owned();
+    let reg_value_printer = "0".to_owned();
     let mut shortcuts = Default::default();
     if options.contains("desktopicon") {
         shortcuts = format!(
@@ -1691,10 +1678,6 @@ copy /Y \"{tmp_path}\\Uninstall {app_name}.lnk\" \"{start_menu}\\\"
      "
         );
         reg_value_start_menu_shortcuts = "1".to_owned();
-    }
-    let install_printer = options.contains("printer") && is_win_10_or_greater();
-    if install_printer {
-        reg_value_printer = "1".to_owned();
     }
 
     let meta = std::fs::symlink_metadata(&current_exe)?;
@@ -1733,11 +1716,8 @@ copy /Y \"{tmp_path}\\{app_name} Tray.lnk\" \"%PROGRAMDATA%\\Microsoft\\Windows\
 ")
     };
 
-    let install_remote_printer = if install_printer {
-        // No need to use `|| true` here.
-        // The script will not exit even if `--install-remote-printer` panics.
-        format!("\"{}\" --install-remote-printer", &src_exe)
-    } else if is_win_10_or_greater() {
+    // Keep removal of an existing queue when upgrading from a version with remote printing.
+    let install_remote_printer = if is_win_10_or_greater() {
         format!("\"{}\" --uninstall-remote-printer", &src_exe)
     } else {
         "".to_owned()
@@ -3478,13 +3458,10 @@ reg add {subkey} /f /v EstimatedSize /t REG_DWORD /d {size}
     // No need to check the install option here, `is_rd_printer_installed` rarely fails.
     let is_printer_installed = remote_printer::is_rd_printer_installed(&app_name).unwrap_or(false);
     // Do nothing if the printer is not installed or failed to query if the printer is installed.
-    let (uninstall_printer_cmd, install_printer_cmd) = if is_printer_installed {
-        (
-            format!("\"{}\" --uninstall-remote-printer", &src_exe),
-            format!("\"{}\" --install-remote-printer", &src_exe),
-        )
+    let uninstall_printer_cmd = if is_printer_installed {
+        format!("\"{}\" --uninstall-remote-printer", &src_exe)
     } else {
-        ("".to_owned(), "".to_owned())
+        "".to_owned()
     };
 
     // We do not try to remove all files in the old version.
@@ -3510,7 +3487,6 @@ taskkill /F /IM {app_name}.exe{filter}
 {remove_meta_toml}
 {restore_service_cmd}
 {uninstall_printer_cmd}
-{install_printer_cmd}
 {sleep}
     ",
         app_name = app_name,

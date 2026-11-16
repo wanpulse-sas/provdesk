@@ -3,12 +3,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot '../utils/Common.ps1')
 $script:payload = Join-Path $root ('work/drivers-' + [guid]::NewGuid().ToString('N'))
-$members = @('usbmmidd_v2/usbmmIdd.inf', 'usbmmidd_v2/x64/usbmmIdd.dll',
-    'drivers/RustDeskPrinterDriver/RustDeskPrinterDriver.inf',
-    'drivers/RustDeskPrinterDriver/RustDeskPrinterDriver.gpd',
-    'drivers/RustDeskPrinterDriver/RustDeskPrinterDriver-manifest.ini',
-    'drivers/RustDeskPrinterDriver/RustDeskPrinterDriverRenderFilter-PipelineConfig.xml',
-    'drivers/RustDeskPrinterDriver/RustDeskPrinterDriverRenderFilter.dll')
+$members = @('usbmmidd_v2/usbmmIdd.inf', 'usbmmidd_v2/x64/usbmmIdd.dll')
 foreach ($relative in $members) {
     $path = Join-Path $payload $relative
     New-Item -ItemType Directory -Force -Path (Split-Path $path -Parent) | Out-Null
@@ -33,4 +28,17 @@ $script:verifyCode = 1
 $failed = $false
 try { Assert-DriverCatalogs } catch { $failed = $true }
 if (-not $failed -or $script:verifiedCatalogMembers.Count) { throw 'Invalid catalog membership accepted.' }
+$script:verifyCode = 0
+foreach ($excluded in @('printer_driver_adapter.dll', 'drivers/RustDeskPrinterDriver')) {
+    $excludedPath = Join-Path $payload $excluded
+    New-Item -ItemType Directory -Force -Path (Split-Path $excludedPath -Parent) | Out-Null
+    Set-Content -LiteralPath $excludedPath -Value 'old printing component'
+    $message = ''
+    try { Assert-DriverCatalogs } catch { $message = $_.Exception.Message }
+    if ($message -notlike 'Removed remote printing component*' -or $script:verifiedCatalogMembers.Count) {
+        throw 'Removed printing component accepted or stale catalog state retained.'
+    }
+    Remove-Item -LiteralPath $excludedPath
+}
+Assert-DriverCatalogs
 Write-Host 'Driver catalog allowlist tests passed (mocked signature verification).'

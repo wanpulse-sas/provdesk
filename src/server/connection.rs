@@ -2648,6 +2648,9 @@ impl Connection {
         control_permissions: &Option<ControlPermissions>,
     ) -> bool {
         use hbb_common::rendezvous_proto::control_permissions::Permission;
+        if enable_prefix_option == keys::OPTION_ENABLE_REMOTE_PRINTER {
+            return false;
+        }
         if let Some(control_permissions) = control_permissions {
             let permission = match enable_prefix_option {
                 keys::OPTION_ENABLE_KEYBOARD => Some(Permission::keyboard),
@@ -3460,14 +3463,18 @@ impl Connection {
                     }
                 }
                 Some(message::Union::FileAction(fa)) => {
-                    let mut handle_fa = self.file_transfer.is_some();
-                    if !handle_fa {
-                        if let Some(file_action::Union::Send(s)) = fa.union.as_ref() {
-                            if JobType::from_proto(s.file_type) == JobType::Printer {
-                                handle_fa = true;
-                            }
+                    if let Some(file_action::Union::Send(s)) = fa.union.as_ref() {
+                        if JobType::from_proto(s.file_type) == JobType::Printer {
+                            self.send(fs::new_error(
+                                s.id,
+                                "Remote printing is not available in ProVdesk",
+                                0,
+                            ))
+                            .await;
+                            return true;
                         }
                     }
+                    let handle_fa = self.file_transfer.is_some();
                     if handle_fa {
                         if self.delayed_read_dir.is_some() {
                             if let Some(file_action::Union::ReadDir(rd)) = fa.union {
@@ -7116,6 +7123,26 @@ fn wildcard_match(pattern: &str, text: &str) -> bool {
 mod test {
     #[allow(unused)]
     use super::*;
+
+    #[test]
+    fn remote_printing_cannot_be_enabled_by_control_permissions() {
+        let permissions = Some(ControlPermissions {
+            permissions: 0xAAAA_AAAA_AAAA_AAAA,
+            ..Default::default()
+        });
+        assert!(!Connection::permission(
+            keys::OPTION_ENABLE_REMOTE_PRINTER,
+            &permissions
+        ));
+        assert!(Connection::permission(
+            keys::OPTION_ENABLE_KEYBOARD,
+            &permissions
+        ));
+        assert!(Connection::permission(
+            keys::OPTION_ENABLE_FILE_TRANSFER,
+            &permissions
+        ));
+    }
 
     // The registry is process-global and the harness runs tests in parallel threads, so every
     // test that admits connections holds this first; a poisoned lock is still a lock.

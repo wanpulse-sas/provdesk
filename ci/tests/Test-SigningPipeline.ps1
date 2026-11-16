@@ -12,11 +12,7 @@ foreach ($name in @('Common', 'VisualStudio', 'BuildResources')) {
 Copy-Item "$repository/ci/Sign-Payload.ps1" "$fixture/ci/Sign-Payload.ps1"
 Set-Content "$payload/ProVdesk.exe" 'OWN'
 Set-Content "$payload/vendor.dll" 'VENDOR'
-$driverFiles = @('usbmmidd_v2/usbmmidd.cat', 'usbmmidd_v2/usbmmIdd.inf', 'usbmmidd_v2/x64/usbmmIdd.dll',
-    'drivers/RustDeskPrinterDriver/rustdeskprinterdriver.cat', 'drivers/RustDeskPrinterDriver/RustDeskPrinterDriver.inf',
-    'drivers/RustDeskPrinterDriver/RustDeskPrinterDriver.gpd', 'drivers/RustDeskPrinterDriver/RustDeskPrinterDriver-manifest.ini',
-    'drivers/RustDeskPrinterDriver/RustDeskPrinterDriverRenderFilter-PipelineConfig.xml',
-    'drivers/RustDeskPrinterDriver/RustDeskPrinterDriverRenderFilter.dll')
+$driverFiles = @('usbmmidd_v2/usbmmidd.cat', 'usbmmidd_v2/usbmmIdd.inf', 'usbmmidd_v2/x64/usbmmIdd.dll')
 foreach ($relative in $driverFiles) {
     $path = Join-Path $payload $relative
     New-Item -ItemType Directory -Force -Path (Split-Path $path -Parent) | Out-Null

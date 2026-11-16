@@ -117,7 +117,7 @@ function Assert-PayloadMatchesManifest([string]$ManifestPath) {
 }
 
 function Get-SigningAction([string]$RelativePath, [string]$Status, [string]$Thumbprint) {
-    if ($RelativePath -match '^(usbmmidd_v2/|drivers/RustDeskPrinterDriver/)') {
+    if ($RelativePath -match '^usbmmidd_v2/') {
         if ($RelativePath -notin $script:verifiedCatalogMembers) { throw "Unverified driver binary: $RelativePath" }
         return 'DriverCatalog'
     }
@@ -131,12 +131,14 @@ function Get-SigningAction([string]$RelativePath, [string]$Status, [string]$Thum
 
 function Assert-DriverCatalogs {
     $script:verifiedCatalogMembers = @()
+    foreach ($excluded in @('printer_driver_adapter.dll', 'drivers/RustDeskPrinterDriver')) {
+        if (Test-Path -LiteralPath (Join-Path $payload $excluded)) {
+            throw "Removed remote printing component found in payload: $excluded"
+        }
+    }
     $verified = @()
     $packages = @(
-        @{ Root = 'usbmmidd_v2'; Catalog = 'usbmmidd.cat'; Members = @('usbmmIdd.inf', 'x64/usbmmIdd.dll') },
-        @{ Root = 'drivers/RustDeskPrinterDriver'; Catalog = 'rustdeskprinterdriver.cat'; Members = @(
-            'RustDeskPrinterDriver.inf', 'RustDeskPrinterDriver.gpd', 'RustDeskPrinterDriver-manifest.ini',
-            'RustDeskPrinterDriverRenderFilter-PipelineConfig.xml', 'RustDeskPrinterDriverRenderFilter.dll') }
+        @{ Root = 'usbmmidd_v2'; Catalog = 'usbmmidd.cat'; Members = @('usbmmIdd.inf', 'x64/usbmmIdd.dll') }
     )
     foreach ($package in $packages) {
         $directory = Join-Path $payload $package.Root

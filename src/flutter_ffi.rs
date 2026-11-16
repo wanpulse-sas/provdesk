@@ -2690,7 +2690,7 @@ pub fn main_get_common(key: String) -> String {
         return false.to_string();
     } else if key == "is-support-printer-driver" {
         #[cfg(target_os = "windows")]
-        return crate::platform::is_win_10_or_greater().to_string();
+        return false.to_string();
         #[cfg(not(target_os = "windows"))]
         return false.to_string();
     } else if key == "transfer-job-id" {
@@ -2778,24 +2778,8 @@ pub fn main_set_common(_key: String, _value: String) {
     #[cfg(target_os = "windows")]
     if _key == "install-printer" && crate::platform::is_win_10_or_greater() {
         std::thread::spawn(move || {
-            let (success, msg) = match remote_printer::install_update_printer(&get_app_name()) {
-                Ok(_) => (true, "".to_owned()),
-                Err(e) => {
-                    let err = e.to_string();
-                    log::error!("Failed to install/update rd printer: {}", &err);
-                    (false, err)
-                }
-            };
-            if success {
-                // Use `ipc` to notify the server process to update the install option in the registry.
-                // Because `install_update_printer()` may prompt for permissions, there is no need to prompt again here.
-                if let Err(e) = crate::ipc::set_install_option(
-                    crate::platform::REG_NAME_INSTALL_PRINTER.to_string(),
-                    "1".to_string(),
-                ) {
-                    log::error!("Failed to set install printer option: {}", e);
-                }
-            }
+            let success = false;
+            let msg = "Remote printing is not available in ProVdesk";
             let data = HashMap::from([
                 ("name", serde_json::json!("install-printer-res")),
                 ("success", serde_json::json!(success)),

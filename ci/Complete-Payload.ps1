@@ -32,15 +32,10 @@ foreach ($file in @('usbmmidd.cat', 'usbmmIdd.inf', 'License.txt', 'idd_instruct
     Copy-Item -LiteralPath (Join-Path $display $file) -Destination $displayDestination.FullName
 }
 Copy-Item -LiteralPath "$display/x64" -Destination $displayDestination.FullName -Recurse
-$printer = Get-LockedAsset 'printer'
-New-Item -ItemType Directory -Path "$payload/drivers" | Out-Null
-Copy-Item -LiteralPath "$printer/rustdesk_printer_driver_v4-1.4" -Destination "$payload/drivers/RustDeskPrinterDriver" -Recurse
-$adapter = Get-LockedAsset 'adapter'
-Copy-Item -LiteralPath "$adapter/printer_driver_adapter.dll" -Destination $payload
 Assert-DriverCatalogs
 
 foreach ($required in @('ProVdesk.exe', 'librustdesk.dll', 'flutter_windows.dll', 'dylib_virtual_display.dll',
-    'WindowInjection.dll', 'printer_driver_adapter.dll', 'data/icudtl.dat', 'data/app.so', 'LICENCE', 'PROVDESK.md')) {
+    'WindowInjection.dll', 'data/icudtl.dat', 'data/app.so', 'LICENCE', 'PROVDESK.md')) {
     if (-not (Test-Path -LiteralPath (Join-Path $payload $required) -PathType Leaf)) { throw "Payload incomplet : $required" }
 }
 if (-not (Test-Path -LiteralPath "$payload/data/flutter_assets" -PathType Container)) { throw 'Assets Flutter absents.' }

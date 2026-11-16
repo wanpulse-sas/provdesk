@@ -250,3 +250,11 @@ prefix and rejects other schemes for ProVdesk.
 This build first produces an unpacked payload for signing. Sign its EXE and DLLs
 before packaging, then sign the final self-extracting installer. Do not rebuild
 the client after signing the payload, because that would replace signed files.
+
+## Windows remote printing
+
+Remote printing is not available. The Windows packages omit the printer adapter
+and RustDesk printer driver; both sending and receiving remote print jobs are
+disabled. Installation and updates retain removal of an existing ProVdesk printer
+queue, but never install or reinstall it. Existing driver removal uses Windows
+printer APIs and does not require shipping the old driver DLLs.
