@@ -46,19 +46,19 @@ function Publish-SignedGitHubRelease([string]$OutputDirectory) {
         $manifest.PipelineCommit -ne $env:BITBUCKET_COMMIT) {
         throw 'GitHub publication requires the signed output of the current Bitbucket build.'
     }
-    $installer = Join-Path $OutputDirectory 'ProVDesk.exe'
+    $installer = Join-Path $OutputDirectory 'ProVdesk.exe'
     Assert-Signature $installer
     $hash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash
     if ($hash -ne $manifest.FinalSHA256 -or (Get-InstallerVersion $installer) -cne $manifest.Version) {
         throw 'The signed installer does not match its build manifest.'
     }
-    if ((Get-Content -LiteralPath "$installer.sha256" -Raw).Trim() -cne "$hash  ProVDesk.exe") {
+    if ((Get-Content -LiteralPath "$installer.sha256" -Raw).Trim() -cne "$hash  ProVdesk.exe") {
         throw 'The installer checksum file does not match the signed executable.'
     }
     $repository = Get-GitHubReleaseRepository
     $tag = "provdesk-$($manifest.Version)-build.$($manifest.BuildNumber)"
     $directory = New-Item -ItemType Directory -Path "$OutputDirectory/github-release" -Force
-    $assetName = "ProVDesk-$($manifest.Version)-windows-x86_64.exe"
+    $assetName = "ProVdesk-$($manifest.Version)-windows-x86_64.exe"
     $releaseExe = Join-Path $directory.FullName $assetName
     Copy-Item -LiteralPath $installer -Destination $releaseExe -Force
     if ((Get-FileHash -LiteralPath $releaseExe -Algorithm SHA256).Hash -ne $hash) {
@@ -73,9 +73,9 @@ function Publish-SignedGitHubRelease([string]$OutputDirectory) {
 | --- | --- |
 | x86-64 (64-bit) | [Signed EXE](https://github.com/$repository/releases/download/$tag/$assetName) |
 
-## ProVDesk
+## ProVdesk
 
-- ProVDesk application branding and Windows installer by WanPulse SAS.
+- ProVdesk application branding and Windows installer by WanPulse SAS.
 - Configurable servers, enforced WebSocket transport and provdesk:// links.
 - Installer and bundled application binaries signed with the WanPulse SAS signing framework.
 
@@ -95,7 +95,7 @@ The checksum file and build.json provide download verification and build provena
     $null = Invoke-GitHubCli -Arguments @('api', "repos/$repository/git/refs", '--hostname', 'github.com',
         '--method', 'POST', '--raw-field', "ref=refs/tags/$tag", '--raw-field', "sha=$($manifest.SourceCommit)")
     $null = Invoke-GitHubCli -Arguments (@('release', 'create', $tag, '--repo', "github.com/$repository",
-        '--verify-tag', '--draft', '--title', "ProVDesk $($manifest.Version) (build $($manifest.BuildNumber))",
+        '--verify-tag', '--draft', '--title', "ProVdesk $($manifest.Version) (build $($manifest.BuildNumber))",
         '--notes-file', $notesPath) + $files)
     $release = Invoke-GitHubCli -Arguments @('release', 'view', $tag, '--repo', "github.com/$repository", '--json', 'databaseId') | ConvertFrom-Json
     $endpoint = "repos/$repository/releases/$($release.databaseId)"

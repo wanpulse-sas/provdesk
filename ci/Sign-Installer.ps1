@@ -11,14 +11,14 @@ Use-BuildTools
 Assert-SignedPayload
 $binaries = @(Get-PayloadBinaries)
 $sourceCommit = (Get-Content -Encoding UTF8 "$work/source-commit.txt" -Raw).Trim()
-$finalExe = Join-Path $work 'ProVDesk.exe'
+$finalExe = Join-Path $work 'ProVdesk.exe'
 
 Invoke-WanPulseSign $finalExe
 python "$root/ci/Verify-Package.py" "$root/libs/portable/data.bin" "$work/payload-signed.json" $finalExe
 Assert-NativeSuccess 'Verification du contenu apres signature finale'
 # Compute the distribution hash AFTER final signing.
 $finalHash = (Get-FileHash -LiteralPath $finalExe -Algorithm SHA256).Hash
-Set-Content "$work/ProVDesk.exe.sha256" "$finalHash  ProVDesk.exe" -Encoding ASCII
+Set-Content "$work/ProVdesk.exe.sha256" "$finalHash  ProVdesk.exe" -Encoding ASCII
 $finalSignature = Get-AuthenticodeSignature -LiteralPath $finalExe
 [pscustomobject]@{
     Version = Get-InstallerVersion $finalExe
@@ -40,4 +40,4 @@ Set-Content "$work/payload-signed.zip.sha256" "$zipHash  payload-signed.zip" -En
 Set-Location $root
 # Expose output artifacts only after all checks have passed.
 Move-Item -LiteralPath $work -Destination (Join-Path $root 'out')
-Write-Host "ProVDesk signe : $($binaries.Count) EXE/DLL internes + EXE final. Tests VM requis avant diffusion."
+Write-Host "ProVdesk signe : $($binaries.Count) EXE/DLL internes + EXE final. Tests VM requis avant diffusion."

@@ -1165,7 +1165,7 @@ fn get_api_server_(api: String, custom: String) -> String {
             return format!("http://{}", s);
         }
     }
-    if option_env!("RUSTDESK_APP_NAME") == Some("ProVDesk") {
+    if option_env!("RUSTDESK_APP_NAME") == Some("ProVdesk") {
         return String::new();
     }
     "https://admin.rustdesk.com".to_owned()
@@ -2971,7 +2971,7 @@ pub fn is_valid_untrusted_peer_id(id: &str) -> bool {
 mod tests {
     #[test]
     fn provdesk_uses_its_own_uri_scheme_without_changing_other_brands() {
-        assert_eq!(super::uri_prefix_for_app("ProVDesk"), "provdesk://");
+        assert_eq!(super::uri_prefix_for_app("ProVdesk"), "provdesk://");
         assert_eq!(super::uri_prefix_for_app("RustDesk"), "rustdesk://");
         assert_eq!(super::uri_prefix_for_app("OtherBrand"), "otherbrand://");
     }

@@ -31,7 +31,7 @@ index 6fe1004..4bf6481 100644
          if rendezvous_server.is_empty() {
              rendezvous_server = PROD_RENDEZVOUS_SERVER.read().unwrap().clone();
          }
-+        if rendezvous_server.is_empty() && option_env!("RUSTDESK_APP_NAME") == Some("ProVDesk") {
++        if rendezvous_server.is_empty() && option_env!("RUSTDESK_APP_NAME") == Some("ProVdesk") {
 +            return String::new();
 +        }
          if rendezvous_server.is_empty() {
@@ -41,7 +41,7 @@ index 6fe1004..4bf6481 100644
          if !s.is_empty() {
              return vec![s];
          }
-+        if option_env!("RUSTDESK_APP_NAME") == Some("ProVDesk") {
++        if option_env!("RUSTDESK_APP_NAME") == Some("ProVdesk") {
 +            return Vec::new();
 +        }
          let serial_obsolute = CONFIG2.read().unwrap().serial > SERIAL;
@@ -53,7 +53,7 @@ index 6fe1004..4bf6481 100644
  
 +    #[test]
 +    fn test_provdesk_requires_configured_rendezvous_server() {
-+        if option_env!("RUSTDESK_APP_NAME") != Some("ProVDesk") { return; }
++        if option_env!("RUSTDESK_APP_NAME") != Some("ProVdesk") { return; }
 +        let _guard = CONFIG_STATE_TEST_LOCK.lock().unwrap();
 +        let original = Config2::get();
 +        let mut cached = Config2::default();

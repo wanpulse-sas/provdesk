@@ -17,7 +17,7 @@ def run(generator):
         root = Path(directory)
         payload = root / 'payload with spaces'
         files = {
-            'ProVDesk.exe': b'MZ signed fixture',
+            'ProVdesk.exe': b'MZ signed fixture',
             'nested/library.dll': b'MZ vendor signature fixture' * 32,
             'data/accents-é.txt': 'Préservation des octets'.encode('utf-8'),
             'data/empty': b'',
@@ -30,7 +30,7 @@ def run(generator):
             manifest.append({'Path': name, 'Length': len(content), 'SHA256': hashlib.sha256(content).hexdigest()})
         blob = root / 'data.bin'
         subprocess.run([sys.executable, str(Path(generator).resolve()), '-f', str(payload),
-                        '-e', str(payload / 'ProVDesk.exe'), '-l', '11', '--package', str(blob)],
+                        '-e', str(payload / 'ProVdesk.exe'), '-l', '11', '--package', str(blob)],
                        check=True, cwd=root)
         manifest_path = root / 'manifest.json'
         manifest_path.write_text(json.dumps(manifest), encoding='utf-8')

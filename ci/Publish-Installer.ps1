@@ -13,4 +13,4 @@ if ([string]::IsNullOrWhiteSpace($env:BITBUCKET_BUILD_NUMBER) -or
     $manifest.PipelineCommit -ne $env:BITBUCKET_COMMIT) {
     throw 'Publication requires the signed output of the current Bitbucket build.'
 }
-Publish-SignedInstaller -FilePath "$root/out/ProVDesk.exe" -ExpectedSHA256 $manifest.FinalSHA256 -Credential $credential -ExpectedVersion $manifest.Version
+Publish-SignedInstaller -FilePath "$root/out/ProVdesk.exe" -ExpectedSHA256 $manifest.FinalSHA256 -Credential $credential -ExpectedVersion $manifest.Version

@@ -1,12 +1,12 @@
 param(
 		[Parameter(Mandatory = $false)]
-		[string]$AppName = 'ProVDesk',
+		[string]$AppName = 'ProVdesk',
 
 		[Parameter(Mandatory = $false)]
 		[string]$EditorName = 'WanPulse',
 
 		[Parameter(Mandatory = $false)]
-		[string]$OutputDir = 'artifacts\ProVDesk',
+		[string]$OutputDir = 'artifacts\ProVdesk',
 
 		[Parameter(Mandatory = $false)]
 		[switch]$SkipPortablePack

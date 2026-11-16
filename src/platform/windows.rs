@@ -1405,7 +1405,7 @@ fn get_default_install_path() -> String {
             pf = tmp;
         }
     }
-    if crate::get_app_name() == "ProVDesk" {
+    if crate::get_app_name() == "ProVdesk" {
         pf.push_str("\\WanPulse");
     }
     format!("{}\\{}", pf, crate::get_app_name())
@@ -1528,7 +1528,7 @@ pub fn remove_meta_toml_cmd(is_msi: bool, path: &str) -> String {
 }
 
 fn get_provdesk_uri_cleanup() -> String {
-    if crate::get_app_name() != "ProVDesk" {
+    if crate::get_app_name() != "ProVdesk" {
         return String::new();
     }
     let (_, _, _, exe) = get_install_info();

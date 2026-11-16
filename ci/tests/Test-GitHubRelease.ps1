@@ -15,9 +15,9 @@ try {
     $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
     $fixture = Join-Path $root ('work/github-release-' + [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $fixture | Out-Null
-    Set-Content "$fixture/ProVDesk.exe" 'signed fixture'
-    $hash = (Get-FileHash "$fixture/ProVDesk.exe").Hash
-    Set-Content "$fixture/ProVDesk.exe.sha256" "$hash  ProVDesk.exe"
+    Set-Content "$fixture/ProVdesk.exe" 'signed fixture'
+    $hash = (Get-FileHash "$fixture/ProVdesk.exe").Hash
+    Set-Content "$fixture/ProVdesk.exe.sha256" "$hash  ProVdesk.exe"
     @{ Version = '1.5.0'; SourceCommit = $env:BITBUCKET_COMMIT; PipelineCommit = $env:BITBUCKET_COMMIT;
         BuildNumber = '19'; FinalSHA256 = $hash } | ConvertTo-Json | Set-Content "$fixture/build.json"
     function Assert-Signature([string]$FilePath) {
@@ -63,7 +63,7 @@ try {
             if ($failed -or -not $script:published -or $script:draft -or $script:tagCommit -ne $env:BITBUCKET_COMMIT) {
                 throw 'Signed release was not published for the built commit.'
             }
-            if (($script:assets.name | Sort-Object) -join ',' -cne 'build.json,ProVDesk-1.5.0-windows-x86_64.exe,ProVDesk-1.5.0-windows-x86_64.exe.sha256') {
+            if (($script:assets.name | Sort-Object) -join ',' -cne 'build.json,ProVdesk-1.5.0-windows-x86_64.exe,ProVdesk-1.5.0-windows-x86_64.exe.sha256') {
                 throw 'Unexpected release assets.'
             }
         } elseif (-not $failed -or $script:published) { throw 'Invalid release was published.' }

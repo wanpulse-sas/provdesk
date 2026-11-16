@@ -10,7 +10,7 @@ foreach ($name in @('Common', 'VisualStudio', 'BuildResources')) {
     Copy-Item "$repository/ci/utils/$name.ps1" "$fixture/ci/utils/$name.ps1"
 }
 Copy-Item "$repository/ci/Sign-Payload.ps1" "$fixture/ci/Sign-Payload.ps1"
-Set-Content "$payload/ProVDesk.exe" 'OWN'
+Set-Content "$payload/ProVdesk.exe" 'OWN'
 Set-Content "$payload/vendor.dll" 'VENDOR'
 $driverFiles = @('usbmmidd_v2/usbmmidd.cat', 'usbmmidd_v2/usbmmIdd.inf', 'usbmmidd_v2/x64/usbmmIdd.dll',
     'drivers/RustDeskPrinterDriver/rustdeskprinterdriver.cat', 'drivers/RustDeskPrinterDriver/RustDeskPrinterDriver.inf',
@@ -58,7 +58,7 @@ Assert-SignedPayload
 $after = @(Get-PayloadManifest)
 foreach ($entry in $original) {
     $actual = $after | Where-Object Path -eq $entry.Path
-    if ($entry.Path -eq 'ProVDesk.exe') {
+    if ($entry.Path -eq 'ProVdesk.exe') {
         if ($actual.SHA256 -eq $entry.SHA256) { throw 'Own binary was not signed.' }
     } elseif ($actual.SHA256 -ne $entry.SHA256) { throw 'Vendor/driver bytes changed.' }
 }

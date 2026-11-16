@@ -18,14 +18,14 @@ class PackageTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             content = b'fake signed PE bytes'
-            name = b'.\\ProVDesk.exe'
+            name = b'.\\ProVdesk.exe'
             compressed = brotli.compress(content)
             blob = (b'rustdesk' + struct.pack('>I', len(name)) + name +
                     struct.pack('>I', len(compressed)) + compressed +
-                    hashlib.md5(content).hexdigest().encode() + b'rustdesk.\\ProVDesk.exe')
+                    hashlib.md5(content).hexdigest().encode() + b'rustdesk.\\ProVdesk.exe')
             (root / 'data.bin').write_bytes(blob)
             (root / 'final.exe').write_bytes(b'MZ-placeholder' + blob + b'signature-placeholder')
-            manifest = [{'Path': 'ProVDesk.exe', 'Length': len(content), 'SHA256': hashlib.sha256(content).hexdigest()}]
+            manifest = [{'Path': 'ProVdesk.exe', 'Length': len(content), 'SHA256': hashlib.sha256(content).hexdigest()}]
             (root / 'manifest.json').write_text(json.dumps(manifest))
             args = [root / name for name in ('data.bin', 'manifest.json', 'final.exe')]
             verifier.verify(*args)

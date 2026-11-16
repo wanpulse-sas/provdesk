@@ -2568,12 +2568,12 @@ class _AboutState extends State<_About> {
                     translate('Website'),
                     style: linkStyle,
                   ).marginSymmetric(vertical: 4.0)),
-              if (appName == 'ProVDesk')
+              if (appName == 'ProVdesk')
                 InkWell(
                     onTap: () {
-                      launchUrlString('https://github.com/wanpulse-sas/proVDesk');
+                      launchUrlString('https://github.com/wanpulse-sas/provdesk');
                     },
-                    child: const Text('ProVDesk source (AGPL-3.0)',
+                    child: const Text('ProVdesk source (AGPL-3.0)',
                             style: linkStyle)
                         .marginSymmetric(vertical: 4.0)),
               Container(

@@ -38,7 +38,7 @@ def verify(blob_path, manifest_path, exe_path):
     if seen != set(expected):
         raise ValueError('Missing payload files')
     entrypoint = blob[offset + 8:].decode('utf-8').replace('\\', '/')
-    if entrypoint != './ProVDesk.exe':
+    if entrypoint != './ProVdesk.exe':
         raise ValueError(f'Unexpected entrypoint: {entrypoint}')
     if blob not in Path(exe_path).read_bytes():
         raise ValueError('Verified payload not embedded in wrapper')

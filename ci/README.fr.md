@@ -1,4 +1,4 @@
-# CI ProVDesk — Windows x64
+# CI ProVdesk — Windows x64
 
 [English](README.md)
 
@@ -26,15 +26,15 @@ La configuration et les patches sont versionnés avec les sources du produit.
 
 | Élément | Adaptation de cette CI |
 | --- | --- |
-| Script ProVDesk | Branding, patch hbb_common, WebSocket forcé et notices conservés |
+| Script ProVdesk | Branding, patch hbb_common, WebSocket forcé et notices conservés |
 | Features Windows du workflow | `flutter,hwcodec,vram` via patch explicite du script |
 | Rust | 1.91.1, version indiquée par PROVDESK.md |
 | Flutter | 3.24.5, commit figé ; patch dropdown du fork et moteur x64 RustDesk vérifié par SHA256 |
-| Bridge | Régénération par le script ProVDesk avec codegen 1.80.1, sans réutiliser l'artefact GitHub généré sous un autre SDK |
+| Bridge | Régénération par le script ProVdesk avec codegen 1.80.1, sans réutiliser l'artefact GitHub généré sous un autre SDK |
 | vcpkg | Baseline du manifeste, overlays du fork, triplet x64-windows-static et installation explicite |
 | Utilitaire | Compilation de WindowInjection.dll au commit ecd8d6a139eee76845ea66423fb739af450fda90, licence incluse |
 | Affichage / impression | Ajout des paquets du workflow, sans suppression silencieuse en cas d'échec |
-| Wrapper | Adaptation DPI identique au workflow ; branding du build.rs ProVDesk conservé |
+| Wrapper | Adaptation DPI identique au workflow ; branding du build.rs ProVdesk conservé |
 | Updater / désinstallation | Implémentés dans le client (`src/updater.rs`, argument `--uninstall` dans `src/core_main.rs`) ; pas d'EXE autonome construit par ce workflow. Les EXE/DLL supplémentaires présents sont inventoriés récursivement |
 
 Les adaptations sont conservées dans `patches/` et archivées avec les artefacts.
@@ -257,7 +257,7 @@ Un checkout propre est obligatoire ; aucune ancienne sortie n'est réutilisée.
 
 Politique de signature : EXE/DLL non signés → framework de signature de WanPulse SAS ; signatures
  tierces valides → conservation octet pour octet ; signature existante invalide →
- échec. Un binaire principal ProVDesk signé par un tiers est refusé. Les paquets
+ échec. Un binaire principal ProVdesk signé par un tiers est refusé. Les paquets
  pilotes sont conservés et vérifiés avec leurs catalogues (`/kp /c`), y compris
  INF/DLL/données déclarées. Pas d'horodatage ajouté aux signatures tierces.
 
@@ -322,11 +322,11 @@ vérifie la version, le SHA-256 et le manifeste du build courant, puis crée le 
 `provdesk-<version>-build.<numéro de build Bitbucket>` sur le commit exact construit.
 Une release brouillon reçoit uniquement :
 
-- `ProVDesk-<version>-windows-x86_64.exe` : les mêmes octets signés que `out/ProVDesk.exe` ;
+- `ProVdesk-<version>-windows-x86_64.exe` : les mêmes octets signés que `out/ProVdesk.exe` ;
 - son fichier `.sha256`, qui utilise le nom versionné de l'artefact ;
 - `build.json` : traçabilité du build et de la signature.
 
-Les notes présentent le téléchargement Windows x64, les caractéristiques ProVDesk,
+Les notes présentent le téléchargement Windows x64, les caractéristiques ProVdesk,
 la version produit, le numéro de build, les sources et le hash de l'installateur.
 GitHub fournit aussi les archives sources du tag ; les sous-modules nécessitent
 encore un clone récursif. Le brouillon est publié seulement après vérification des
@@ -340,11 +340,11 @@ Payload, rapports de signature et diagnostics restent dans les artefacts Bitbuck
 ### Publication SMB
 
 Sur `master`, après la release GitHub, `Publish-Installer.ps1` publie exclusivement
-`out/ProVDesk.exe` vers `\\<ARTIFACTS_SHARING_HOST>\builds\WanPulse\ProVDesk\ProVDesk-<version>.exe`.
+`out/ProVdesk.exe` vers `\\<ARTIFACTS_SHARING_HOST>\builds\WanPulse\ProVDesk\ProVdesk-<version>.exe`.
 Le serveur vient de la variable obligatoire `ARTIFACTS_SHARING_HOST` (par exemple
 `wp-cloudstorage`, sans `\\` ni chemin). Le partage `builds` et le sous-dossier
 `WanPulse\ProVDesk` restent fixes ; `WANPULSE_OEM_PUBLISHER` ne les modifie pas. La version est lue dans `ProductVersion` de l'EXE final signé, enregistrée dans
-`build.json` puis revérifiée avant publication. Par exemple : `ProVDesk-1.5.0.exe`.
+`build.json` puis revérifiée avant publication. Par exemple : `ProVdesk-1.5.0.exe`.
 Une version absente, incohérente ou impropre à un nom de fichier bloque la publication.
 Chaque build réussi sur `master` remplace uniquement le fichier de
 la même version ; les EXE des autres versions sont conservés dans le même dossier.
@@ -376,14 +376,14 @@ Aucune interaction ni élévation UAC n'est nécessaire.
 La publication exige le manifeste du build Bitbucket courant, une signature
 WanPulse SAS valide et horodatée, et un SHA256 identique à `build.json`. L'EXE est copié
 sous un nom temporaire unique, relu pour vérifier son SHA256 puis renommé en
-`ProVDesk-<version>.exe`. Le fichier local `out/ProVDesk.exe` reste inchangé. Une erreur fait échouer le pipeline ; le fichier temporaire est
+`ProVdesk-<version>.exe`. Le fichier local `out/ProVdesk.exe` reste inchangé. Une erreur fait échouer le pipeline ; le fichier temporaire est
 nettoyé si possible et le lecteur SMB démonté. Une coupure réseau peut empêcher
 ce nettoyage. Aucun autre fichier de `out/` n'est copié. Hors de `master`,
 cette étape et le précontrôle SMB sont ignorés ; aucun identifiant SMB n'est requis.
 
 À conserver comme artefacts Bitbucket :
 
-- `ProVDesk.exe.sha256` : empreinte du fichier final après signature.
+- `ProVdesk.exe.sha256` : empreinte du fichier final après signature.
 - `build.json` : version de l’EXE final, commits, numéro de build, signataire et empreinte finale.
 - `signatures.json`, `payload-signed.json` : rapport des signatures et inventaire
   des fichiers embarqués avec leurs empreintes.

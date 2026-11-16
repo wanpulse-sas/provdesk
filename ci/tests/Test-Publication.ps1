@@ -14,10 +14,10 @@ $env:ARTIFACTS_SHARING_PASSWORD = 'fixture'
 $repository = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $fixture = Join-Path $repository ('work/publication-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path "$fixture/share", "$fixture/out" -Force | Out-Null
-Set-Content "$fixture/out/ProVDesk.exe" 'signed fixture'
+Set-Content "$fixture/out/ProVdesk.exe" 'signed fixture'
 Set-Content "$fixture/out/build.json" 'must not be published'
 Set-Content "$fixture/out/vendor.dll" 'must not be published'
-$hash = (Get-FileHash "$fixture/out/ProVDesk.exe").Hash
+$hash = (Get-FileHash "$fixture/out/ProVdesk.exe").Hash
 $credential = New-Object System.Management.Automation.PSCredential('test', (ConvertTo-SecureString 'fixture' -AsPlainText -Force))
 $script:rejectSignature = $false
 $script:signatureChecked = $false
@@ -35,7 +35,7 @@ function Get-PublicationShareRoot {
 $script:fixtureVersion = '1.5.0'
 function Get-Item {
     param($LiteralPath, $ErrorAction)
-    if ($LiteralPath -eq "$fixture/out/ProVDesk.exe") {
+    if ($LiteralPath -eq "$fixture/out/ProVdesk.exe") {
         return [pscustomobject]@{ VersionInfo = [pscustomobject]@{ ProductVersion = $script:fixtureVersion } }
     }
     Microsoft.PowerShell.Management\Get-Item -LiteralPath $LiteralPath -ErrorAction Stop
@@ -56,7 +56,7 @@ function New-PSDrive {
 function Copy-Item {
     param($LiteralPath, $Destination, $ErrorAction)
     $script:copyCount++
-    if ((Split-Path $LiteralPath -Leaf) -ne 'ProVDesk.exe') { throw 'Unexpected published file.' }
+    if ((Split-Path $LiteralPath -Leaf) -ne 'ProVdesk.exe') { throw 'Unexpected published file.' }
     Microsoft.PowerShell.Management\Copy-Item -LiteralPath $LiteralPath -Destination $Destination -ErrorAction Stop
     if ($script:copyMode -eq 'corrupt') { Add-Content -LiteralPath $Destination 'corruption' }
     if ($script:copyMode -eq 'fail') { throw 'Simulated interrupted upload.' }
@@ -66,9 +66,9 @@ function Expect-Failure([scriptblock]$Action) {
     try { & $Action } catch { $failed = $true }
     if (-not $failed) { throw 'Expected publication failure was accepted.' }
 }
-$publish = { Publish-SignedInstaller "$fixture/out/ProVDesk.exe" $hash $credential '1.5.0' }
+$publish = { Publish-SignedInstaller "$fixture/out/ProVdesk.exe" $hash $credential '1.5.0' }
 & $publish
-$destination = "$fixture/share/WanPulse/ProVDesk/ProVDesk-1.5.0.exe"
+$destination = "$fixture/share/WanPulse/ProVDesk/ProVdesk-1.5.0.exe"
 if ((Get-FileHash $destination).Hash -ne $hash -or $script:copyCount -ne 1) { throw 'First upload failed.' }
 # Verify replacement of an existing executable with Windows PowerShell 5.1 file operations.
 Set-Content -LiteralPath $destination 'previous build'
@@ -84,7 +84,7 @@ $mounts = $script:mountCount
 $script:rejectSignature = $true
 Expect-Failure $publish
 $script:rejectSignature = $false
-Expect-Failure { Publish-SignedInstaller "$fixture/out/ProVDesk.exe" ('0' * 64) $credential '1.5.0' }
+Expect-Failure { Publish-SignedInstaller "$fixture/out/ProVdesk.exe" ('0' * 64) $credential '1.5.0' }
 Expect-Failure { Publish-SignedInstaller "$fixture/out/vendor.dll" $hash $credential '1.5.0' }
 foreach ($invalid in @('', '..', '../other', '1.5.0\other', '1.5.0.', '1.5.0:stream', '1.5.0 ', "1.5.0`n")) {
     $script:fixtureVersion = $invalid
@@ -94,22 +94,22 @@ $script:fixtureVersion = '2.0.0'
 Expect-Failure $publish
 if ($script:mountCount -ne $mounts) { throw 'Unverified input reached the SMB share.' }
 $script:copyMode = 'success'
-Publish-SignedInstaller "$fixture/out/ProVDesk.exe" $hash $credential '2.0.0'
-if ((Get-FileHash "$fixture/share/WanPulse/ProVDesk/ProVDesk-2.0.0.exe").Hash -ne $hash -or
+Publish-SignedInstaller "$fixture/out/ProVdesk.exe" $hash $credential '2.0.0'
+if ((Get-FileHash "$fixture/share/WanPulse/ProVDesk/ProVdesk-2.0.0.exe").Hash -ne $hash -or
     (Get-FileHash $destination).Hash -ne $hash) { throw 'Versioned executables were not preserved side by side.' }
 foreach ($valid in @('1.5.0+68', '1.5.0.1', '2.0.0-rc.1+42')) {
     $script:fixtureVersion = $valid
-    if ((Get-InstallerVersion "$fixture/out/ProVDesk.exe") -cne $valid) { throw 'Product version was rewritten.' }
-    Publish-SignedInstaller "$fixture/out/ProVDesk.exe" $hash $credential $valid
-    if ((Get-FileHash -LiteralPath "$fixture/share/WanPulse/ProVDesk/ProVDesk-$valid.exe").Hash -ne $hash) {
+    if ((Get-InstallerVersion "$fixture/out/ProVdesk.exe") -cne $valid) { throw 'Product version was rewritten.' }
+    Publish-SignedInstaller "$fixture/out/ProVdesk.exe" $hash $credential $valid
+    if ((Get-FileHash -LiteralPath "$fixture/share/WanPulse/ProVDesk/ProVdesk-$valid.exe").Hash -ne $hash) {
         throw 'The detected version was not preserved in the published filename.'
     }
 }
 $entries = @(Get-ChildItem "$fixture/share/WanPulse/ProVDesk" -Force)
-if ($entries.Count -ne 5 -or @($entries | Where-Object { $_.PSIsContainer -or $_.Name -notlike 'ProVDesk-*.exe' }).Count) {
+if ($entries.Count -ne 5 -or @($entries | Where-Object { $_.PSIsContainer -or $_.Name -notlike 'ProVdesk-*.exe' }).Count) {
     throw 'Publication created a version directory, an unversioned executable or an unexpected artifact.'
 }
-if ((Get-FileHash "$fixture/out/ProVDesk.exe").Hash -ne $hash) { throw 'Publication modified the source executable.' }
+if ((Get-FileHash "$fixture/out/ProVdesk.exe").Hash -ne $hash) { throw 'Publication modified the source executable.' }
 if (@(Get-PSDrive | Where-Object Name -Like 'ProVDeskPublish*').Count) { throw 'Publication drive leaked.' }
 $savedUser = $env:ARTIFACTS_SHARING_USER
 $savedPassword = $env:ARTIFACTS_SHARING_PASSWORD

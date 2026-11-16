@@ -8,10 +8,10 @@ Assert-FreeDiskSpace 'Build-Payload'
 Use-BuildTools
 Remove-Item Env:CARGO_BUILD_TARGET -ErrorAction SilentlyContinue
 Remove-Item Env:CARGO_TARGET_DIR -ErrorAction SilentlyContinue
-powershell -NoProfile -File scripts/windows/build-rustdesk-appname.ps1 -AppName ProVDesk -EditorName WanPulse -OutputDir artifacts\ci-payload -SkipPortablePack
+powershell -NoProfile -File scripts/windows/build-rustdesk-appname.ps1 -AppName ProVdesk -EditorName WanPulse -OutputDir artifacts\ci-payload -SkipPortablePack
 Assert-NativeSuccess 'Compilation du payload'
 $script:payload = (Resolve-Path artifacts/ci-payload).Path
-if (-not (Test-Path -LiteralPath "$payload/ProVDesk.exe" -PathType Leaf)) { throw 'ProVDesk.exe absent du payload.' }
+if (-not (Test-Path -LiteralPath "$payload/ProVdesk.exe" -PathType Leaf)) { throw 'ProVdesk.exe absent du payload.' }
 $links = @(Get-ChildItem -LiteralPath $payload -Recurse -Force |
     Where-Object { $_.Attributes -band [IO.FileAttributes]::ReparsePoint })
 if ($links.Count -gt 0) { throw 'Liens/reparse points interdits dans le payload.' }

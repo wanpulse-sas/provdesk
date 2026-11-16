@@ -45,12 +45,12 @@ try {
     $directory = "$fixture\WanPulse\ProVDesk"
     if (@(Get-ChildItem -LiteralPath $directory -Force).Count -ne 0) { throw 'Preflight left temporary files.' }
     $inputDirectory = New-Item -ItemType Directory -Path "$fixture\input"
-    $exe = Join-Path $inputDirectory.FullName 'ProVDesk.exe'
+    $exe = Join-Path $inputDirectory.FullName 'ProVdesk.exe'
     Set-Content -LiteralPath $exe -Value 'test executable bytes; not a release' -Encoding ASCII -NoNewline
     $hash = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash
     function Assert-Signature([string]$FilePath) { if ($FilePath -ne $exe) { throw 'Unexpected test executable.' } }
     function Get-InstallerVersion([string]$FilePath) { return '1.5.0' }
-    $published = "$directory\ProVDesk-1.5.0.exe"
+    $published = "$directory\ProVdesk-1.5.0.exe"
     foreach ($attempt in 1..2) {
         Publish-SignedInstaller $exe $hash $TestCredential '1.5.0'
         if ((Get-FileHash -LiteralPath $published -Algorithm SHA256).Hash -ne $hash) { throw 'UNC publication changed file bytes.' }

@@ -11,7 +11,7 @@ $signed = @((Get-Content -Encoding UTF8 "$work/payload-signed.json" -Raw | Conve
 Remove-Item Env:CARGO_BUILD_TARGET -ErrorAction SilentlyContinue
 
 # Build only the wrapper AFTER signing the client.
-$env:RUSTDESK_APP_NAME = 'ProVDesk'
+$env:RUSTDESK_APP_NAME = 'ProVdesk'
 $env:RUSTDESK_EDITOR_NAME = 'WanPulse'
 $env:CARGO_TARGET_DIR = Join-Path $root 'target'
 Set-Location $root
@@ -24,12 +24,12 @@ Assert-NativeSuccess 'Patch manifeste wrapper'
 Copy-Item -LiteralPath $manifestPatch -Destination "$work/wrapper-manifest.patch"
 python -c "import importlib.metadata; assert importlib.metadata.version('brotli') == '1.2.1', 'Brotli 1.2.1 requis'"
 Assert-NativeSuccess 'Verification Brotli'
-python libs/portable/generate.py -f $payload -o libs/portable -e "$payload\ProVDesk.exe" -t x86_64-pc-windows-msvc
+python libs/portable/generate.py -f $payload -o libs/portable -e "$payload\ProVdesk.exe" -t x86_64-pc-windows-msvc
 Assert-NativeSuccess 'Packaging du payload signe'
 $afterPackaging = @(Get-PayloadManifest)
 if (Compare-Object $signed $afterPackaging -Property Path,SHA256,Length) { throw 'Payload modifie par le packaging.' }
 Assert-SignedPayload
-$finalExe = Join-Path $work 'ProVDesk.exe'
+$finalExe = Join-Path $work 'ProVdesk.exe'
 Copy-Item -LiteralPath target/x86_64-pc-windows-msvc/release/rustdesk-portable-packer.exe -Destination $finalExe
 python "$root/ci/Verify-Package.py" "$root/libs/portable/data.bin" "$work/payload-signed.json" $finalExe
 Assert-NativeSuccess 'Verification du contenu embarque'

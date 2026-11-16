@@ -121,11 +121,11 @@ function Get-SigningAction([string]$RelativePath, [string]$Status, [string]$Thum
         if ($RelativePath -notin $script:verifiedCatalogMembers) { throw "Unverified driver binary: $RelativePath" }
         return 'DriverCatalog'
     }
-    $ownBinary = $RelativePath -in @('ProVDesk.exe', 'librustdesk.dll', 'dylib_virtual_display.dll')
+    $ownBinary = $RelativePath -in @('ProVdesk.exe', 'librustdesk.dll', 'dylib_virtual_display.dll')
     if ($Status -eq 'NotSigned') { return 'WanPulse' }
     if ($Status -ne 'Valid') { throw "Signature existante invalide : $RelativePath ($Status)" }
     if ($Thumbprint -eq $script:expectedThumbprint) { return 'WanPulseExisting' }
-    if ($ownBinary) { throw "Signataire tiers inattendu sur un binaire ProVDesk : $RelativePath" }
+    if ($ownBinary) { throw "Signataire tiers inattendu sur un binaire ProVdesk : $RelativePath" }
     return 'ThirdParty'
 }
 

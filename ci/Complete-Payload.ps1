@@ -39,7 +39,7 @@ $adapter = Get-LockedAsset 'adapter'
 Copy-Item -LiteralPath "$adapter/printer_driver_adapter.dll" -Destination $payload
 Assert-DriverCatalogs
 
-foreach ($required in @('ProVDesk.exe', 'librustdesk.dll', 'flutter_windows.dll', 'dylib_virtual_display.dll',
+foreach ($required in @('ProVdesk.exe', 'librustdesk.dll', 'flutter_windows.dll', 'dylib_virtual_display.dll',
     'WindowInjection.dll', 'printer_driver_adapter.dll', 'data/icudtl.dat', 'data/app.so', 'LICENCE', 'PROVDESK.md')) {
     if (-not (Test-Path -LiteralPath (Join-Path $payload $required) -PathType Leaf)) { throw "Payload incomplet : $required" }
 }

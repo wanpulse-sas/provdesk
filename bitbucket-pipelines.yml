@@ -18,7 +18,7 @@ pipelines:
   branches:
     master:
       - step: &signed-build
-          name: Build, sign and package ProVDesk
+          name: Build, sign and package ProVdesk
           runs-on:
             - self.hosted
             - windows

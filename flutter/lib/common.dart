@@ -2393,7 +2393,7 @@ bool handleUriLink({List<String>? cmdArgs, Uri? uri, String? uriString}) {
 }
 
 List<String>? urlLinkToCmdArgs(Uri uri) {
-  if (appName == 'ProVDesk' && uri.scheme != 'provdesk') {
+  if (appName == 'ProVdesk' && uri.scheme != 'provdesk') {
     return null;
   }
   String? command;

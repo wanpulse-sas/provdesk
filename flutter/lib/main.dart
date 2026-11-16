@@ -133,7 +133,7 @@ Future<void> initEnv(String appType) async {
 void runMainApp(bool startService) async {
   // register uni links
   await initEnv(kAppTypeMain);
-  if (isWindows && appName == 'ProVDesk' && !bind.mainIsInstalled()) {
+  if (isWindows && appName == 'ProVdesk' && !bind.mainIsInstalled()) {
     runInstallPage(initialize: false);
     return;
   }

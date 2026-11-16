@@ -84,8 +84,8 @@ function Get-InstallerVersion([string]$FilePath) {
 
 function Publish-SignedInstaller([string]$FilePath, [string]$ExpectedSHA256, [pscredential]$Credential, [string]$ExpectedVersion) {
     if (-not (Test-Path -LiteralPath $FilePath -PathType Leaf) -or
-        [IO.Path]::GetFileName($FilePath) -ne 'ProVDesk.exe') {
-        throw 'Publication requires the final ProVDesk.exe file.'
+        [IO.Path]::GetFileName($FilePath) -ne 'ProVdesk.exe') {
+        throw 'Publication requires the final ProVdesk.exe file.'
     }
     if ($ExpectedSHA256 -notmatch '^[A-Fa-f0-9]{64}$') { throw 'Invalid expected executable SHA256.' }
     Assert-Signature $FilePath
@@ -104,9 +104,9 @@ function Publish-SignedInstaller([string]$FilePath, [string]$ExpectedSHA256, [ps
         # Windows PowerShell 5.1 can repeat a UNC root when resolving a temporary PSDrive.
         # Keep the authenticated SMB connection, but use absolute UNC paths for all file operations.
         $directory = "$share\WanPulse\ProVDesk"
-        $fileName = "ProVDesk-$version.exe"
+        $fileName = "ProVdesk-$version.exe"
         New-Item -ItemType Directory -Path $directory -Force -ErrorAction Stop | Out-Null
-        $temporary = Join-Path $directory ('.ProVDesk-' + [guid]::NewGuid().ToString('N') + '.exe')
+        $temporary = Join-Path $directory ('.ProVdesk-' + [guid]::NewGuid().ToString('N') + '.exe')
         Copy-Item -LiteralPath $FilePath -Destination $temporary -ErrorAction Stop
         if ((Get-FileHash -LiteralPath $temporary -Algorithm SHA256).Hash -ne $ExpectedSHA256) {
             throw 'The uploaded executable failed SHA256 verification.'
