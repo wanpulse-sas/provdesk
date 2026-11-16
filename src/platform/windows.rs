@@ -1590,7 +1590,7 @@ fn get_after_install(
     netsh advfirewall firewall add rule name=\"{app_name} Service\" dir=in action=allow program=\"{exe}\" enable=yes
     {create_service}
     reg add HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System /f /v SoftwareSASGeneration /t REG_DWORD /d 1
-    ", create_service=get_create_service(&exe),
+    ", create_service=get_create_service_after_install(&exe),
         provdesk_uri_cleanup=get_provdesk_uri_cleanup())
 }
 
@@ -3865,6 +3865,21 @@ sc delete {app_name}
 )
 }
 
+fn get_create_service_after_install(exe: &str) -> String {
+    let app_name = crate::get_app_name();
+    if app_name != "ProVdesk"
+        || config::is_outgoing_only()
+        || Config::get_option("stop-service") == "Y"
+    {
+        return get_create_service(exe);
+    }
+
+    let exe = escape_nested_cmd_ampersands(exe);
+    format!(
+        "\nsc create {app_name} binpath= \"\\\"{exe}\\\" --service\" start= demand DisplayName= \"{app_name} Service\"\n"
+    )
+}
+
 fn get_create_service(exe: &str) -> String {
     if config::is_outgoing_only() {
         return "".to_string();
@@ -3877,10 +3892,11 @@ if exist \"%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\{ap
     } else {
         let exe = escape_nested_cmd_ampersands(exe);
         format!("
-sc create {app_name} binpath= \"\\\"{exe}\\\" --service\" start= auto DisplayName= \"{app_name} Service\"
+sc create {app_name} binpath= \"\\\"{exe}\\\" --service\" start= {start_mode} DisplayName= \"{app_name} Service\"
 sc start {app_name}
 ",
-    app_name = crate::get_app_name())
+    app_name = crate::get_app_name(),
+    start_mode = if crate::get_app_name() == "ProVdesk" { "demand" } else { "auto" })
     }
 }
 
