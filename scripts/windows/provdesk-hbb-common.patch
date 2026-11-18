@@ -11,9 +11,18 @@ index 43e3282..b2340ce 100644
  
      std::fs::create_dir_all(&out_dir).unwrap();
 diff --git a/src/config.rs b/src/config.rs
-index 6fe1004..4bf6481 100644
+index 6fe1004..7480407 100644
 --- a/src/config.rs
 +++ b/src/config.rs
+@@ -11,7 +11,7 @@ use std::{
+ 
+ use anyhow::{anyhow, Result};
+ use bytes::Bytes;
+-use rand::Rng;
++use rand::{distributions::Alphanumeric, Rng};
+ use regex::Regex;
+ use serde as de;
+ use serde_derive::{Deserialize, Serialize};
 @@ -69,7 +69,11 @@ lazy_static::lazy_static! {
      static ref ONLINE: Mutex<HashMap<String, i64>> = Default::default();
      pub static ref PROD_RENDEZVOUS_SERVER: RwLock<String> = RwLock::new("".to_owned());
@@ -27,7 +36,34 @@ index 6fe1004..4bf6481 100644
      static ref KEY_PAIR: Mutex<Option<KeyPair>> = Default::default();
      static ref USER_DEFAULT_CONFIG: RwLock<(UserDefaultConfig, Instant)> = RwLock::new((UserDefaultConfig::load(), Instant::now()));
      pub static ref NEW_STORED_PEER_CONFIG: Mutex<HashSet<String>> = Default::default();
-@@ -915,6 +919,9 @@ impl Config {
+@@ -203,6 +207,8 @@ pub enum NetworkType {
+     ProxySocks,
+ }
+ 
++const PROVDESK_REGISTRATION_RETRY_LIMIT: u8 = 2;
++
+ #[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]
+ pub struct Config {
+     #[serde(
+@@ -223,6 +229,8 @@ pub struct Config {
+     key_confirmed: bool,
+     #[serde(default, deserialize_with = "deserialize_hashmap_string_bool")]
+     keys_confirmed: HashMap<String, bool>,
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    provdesk_registration_retries: Option<u8>,
+ }
+ 
+ #[derive(Debug, Default, PartialEq, Serialize, Deserialize, Clone)]
+@@ -608,7 +616,7 @@ impl Config {
+ 
+     fn load() -> Config {
+         let mut config = Config::load_::<Config>("");
+-        let mut store = false;
++        let mut store = config.initialize_provdesk_identity();
+         if let Err(err) = Self::validate_or_decrypt_permanent_password_storage(&mut config) {
+             log::error!("Failed to validate or decrypt permanent password storage: {err}");
+         }
+@@ -915,6 +923,9 @@ impl Config {
          if rendezvous_server.is_empty() {
              rendezvous_server = PROD_RENDEZVOUS_SERVER.read().unwrap().clone();
          }
@@ -37,7 +73,7 @@ index 6fe1004..4bf6481 100644
          if rendezvous_server.is_empty() {
              rendezvous_server = CONFIG2.read().unwrap().rendezvous_server.clone();
          }
-@@ -943,6 +950,9 @@ impl Config {
+@@ -943,6 +954,9 @@ impl Config {
          if !s.is_empty() {
              return vec![s];
          }
@@ -47,7 +83,172 @@ index 6fe1004..4bf6481 100644
          let serial_obsolute = CONFIG2.read().unwrap().serial > SERIAL;
          if serial_obsolute {
              let ss: Vec<String> = Self::get_option("rendezvous-servers")
-@@ -3005,6 +3015,24 @@ mod tests {
+@@ -987,6 +1001,9 @@ impl Config {
+         if id == config.id {
+             return;
+         }
++        if option_env!("RUSTDESK_APP_NAME") == Some("ProVdesk") {
++            config.provdesk_registration_retries = None;
++        }
+         config.id = id.into();
+         config.store();
+     }
+@@ -1069,6 +1086,75 @@ impl Config {
+         }
+     }
+ 
++    fn new_provdesk_id() -> String {
++        let mut rng = rand::thread_rng();
++        let index = rng.gen_range(0..52u8);
++        let first = if index < 26 {
++            b'A' + index
++        } else {
++            b'a' + index - 26
++        };
++        let mut id = String::with_capacity(15);
++        id.push(char::from(first));
++        id.extend(rng.sample_iter(Alphanumeric).take(14).map(char::from));
++        id
++    }
++
++    fn initialize_provdesk_identity(&mut self) -> bool {
++        if option_env!("RUSTDESK_APP_NAME") != Some("ProVdesk")
++            || !self.id.is_empty()
++            || !self.enc_id.is_empty()
++        {
++            return false;
++        }
++        self.id = Self::new_provdesk_id();
++        self.provdesk_registration_retries = Some(0);
++        true
++    }
++
++    fn retry_fresh_provdesk_identity(&mut self) -> bool {
++        if option_env!("RUSTDESK_APP_NAME") != Some("ProVdesk") {
++            return false;
++        }
++        let Some(retries) = self.provdesk_registration_retries else {
++            return false;
++        };
++        if retries >= PROVDESK_REGISTRATION_RETRY_LIMIT {
++            return false;
++        }
++        self.id = Self::new_provdesk_id();
++        self.provdesk_registration_retries = Some(retries + 1);
++        self.key_confirmed = false;
++        self.keys_confirmed.clear();
++        true
++    }
++
++    pub fn is_pending_provdesk_registration() -> bool {
++        option_env!("RUSTDESK_APP_NAME") == Some("ProVdesk")
++            && CONFIG.read().unwrap().provdesk_registration_retries.is_some()
++    }
++
++    pub fn retry_provdesk_registration() -> bool {
++        let mut config = CONFIG.write().unwrap();
++        if !config.retry_fresh_provdesk_identity() {
++            return false;
++        }
++        config.store();
++        true
++    }
++
++    fn finish_fresh_provdesk_registration(&mut self) -> bool {
++        option_env!("RUSTDESK_APP_NAME") == Some("ProVdesk")
++            && self.provdesk_registration_retries.take().is_some()
++    }
++
++    pub fn confirm_provdesk_registration() {
++        let mut config = CONFIG.write().unwrap();
++        if config.finish_fresh_provdesk_registration() {
++            config.store();
++        }
++    }
++
+     pub fn get_auto_password(length: usize) -> String {
+         Self::get_auto_password_with_chars(length, CHARS)
+     }
+@@ -2940,6 +3026,78 @@ impl Status {
+ mod tests {
+     use super::{permanent_password::PERMANENT_PASSWORD_ENC_VERSION, *};
+ 
++    #[test]
++    fn provdesk_random_identity_requires_no_previous_id() {
++        if option_env!("RUSTDESK_APP_NAME") != Some("ProVdesk") {
++            return;
++        }
++        let mut config = Config::default();
++        assert!(config.initialize_provdesk_identity());
++        assert_eq!(config.id.len(), 15);
++        assert!(config.id.as_bytes()[0].is_ascii_alphabetic());
++        assert!(config.id.bytes().all(|value| value.is_ascii_alphanumeric()));
++        assert!(crate::is_valid_custom_id(&config.id));
++        let saved = config.id.clone();
++        assert!(!config.initialize_provdesk_identity());
++        assert_eq!(config.id, saved);
++        let mut legacy = Config {
++            id: "123456789".to_owned(),
++            ..Default::default()
++        };
++        assert!(!legacy.initialize_provdesk_identity());
++        assert_eq!(legacy.id, "123456789");
++        let mut encrypted = Config {
++            enc_id: "existing-encrypted-id".to_owned(),
++            ..Default::default()
++        };
++        assert!(!encrypted.initialize_provdesk_identity());
++        assert_eq!(encrypted.enc_id, "existing-encrypted-id");
++    }
++
++    #[test]
++    fn provdesk_registration_retries_twice_without_changing_keys() {
++        if option_env!("RUSTDESK_APP_NAME") != Some("ProVdesk") {
++            return;
++        }
++        let keys = (vec![7; 64], vec![8; 32]);
++        let mut config = Config {
++            key_pair: keys.clone(),
++            ..Default::default()
++        };
++        assert!(config.initialize_provdesk_identity());
++        for expected in 1..=2 {
++            assert!(config.retry_fresh_provdesk_identity());
++            assert!(crate::is_valid_custom_id(&config.id));
++            assert_eq!(config.id.len(), 15);
++            assert_eq!(config.key_pair, keys);
++            config = toml::from_str(&toml::to_string(&config).unwrap()).unwrap();
++            assert_eq!(config.provdesk_registration_retries, Some(expected));
++        }
++        let saved = config.id.clone();
++        assert!(!config.retry_fresh_provdesk_identity());
++        assert_eq!(config.id, saved);
++    }
++
++    #[test]
++    fn provdesk_success_disables_first_registration_recovery() {
++        if option_env!("RUSTDESK_APP_NAME") != Some("ProVdesk") {
++            return;
++        }
++        let mut config = Config::default();
++        assert!(config.initialize_provdesk_identity());
++        let saved = config.id.clone();
++        assert!(config.finish_fresh_provdesk_registration());
++        config = toml::from_str(&toml::to_string(&config).unwrap()).unwrap();
++        assert!(!config.retry_fresh_provdesk_identity());
++        assert_eq!(config.id, saved);
++        let mut established = Config {
++            id: "987654321".to_owned(),
++            ..Default::default()
++        };
++        assert!(!established.retry_fresh_provdesk_identity());
++        assert_eq!(established.id, "987654321");
++    }
++
+     static CONFIG_STATE_TEST_LOCK: Mutex<()> = Mutex::new(());
+ 
+     struct ConfigStateTestGuard {
+@@ -3005,6 +3163,24 @@ mod tests {
          test()
      }
  

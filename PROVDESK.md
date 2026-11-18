@@ -24,6 +24,26 @@ API URL and server public key are configured normally at runtime; this build
 contains no embedded values for those settings. Domain endpoints use secure
 WebSocket (`wss://`) even when the API URL is empty.
 
+## Fresh device identity
+
+When neither a plain nor an encrypted previous ID exists, ProVdesk creates a
+15-character random ID: an ASCII letter followed by 14 ASCII letters or digits.
+Existing IDs and key pairs are preserved. There is no post-registration rename.
+
+A fresh identity can use two replacement IDs if initial registration returns
+UUID_MISMATCH or NOT_SUPPORT. The same key pair is retained. An optional counter
+in the identity configuration survives restarts and configuration import; after
+two retries the final candidate is retained. Successful registration removes the
+counter, and explicit ID changes cancel recovery. Existing registration paths
+outside this fresh-identity flow retain their previous behavior. NOT_SUPPORT is
+a generic rejection, so exhausting retries requires checking server policy or
+identity records. Other rejection codes do not trigger this recovery.
+
+The implementation is carried by the existing hbb_common customization patch
+and the client rendezvous response handler. Public-server fallback stays disabled.
+Regression tests cover fresh-ID eligibility and format, the two-retry limit with
+key preservation and counter serialization, and recovery ending on success.
+
 ## Reproduce the Windows build
 
 Clone the published ProVdesk source commit with `git clone --recurse-submodules`.
