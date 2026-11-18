@@ -26,13 +26,36 @@ try {
         $script:signatureChecked = $true
     }
     function Get-InstallerVersion([string]$FilePath) { return '1.5.0' }
+    function Get-Command { return @{ Source = 'Invoke-FixtureGit' } }
+    function Invoke-FixtureGit {
+        if (-not $script:signatureChecked) { throw 'Synchronization before signature verification.' }
+        $global:LASTEXITCODE = 0
+        if ($args[0] -eq 'rev-parse') { return 'true' }
+        if ($args[0] -eq 'fetch') {
+            if (($args -join ' ') -cne 'fetch --unshallow --no-tags origin master') { throw 'Unexpected history fetch.' }
+            return
+        }
+        $script:pushAttempted = $true
+        if ('--no-force' -notin $args -or '--no-follow-tags' -notin $args -or
+            $args[-2] -cne 'https://github.com/fixture/product.git' -or
+            $args[-1] -cne "${env:BITBUCKET_COMMIT}:refs/heads/master") {
+            throw 'Synchronization did not push only the exact built commit without force.'
+        }
+        if ('credential.helper=!gh auth git-credential' -notin $args -or $env:GIT_TERMINAL_PROMPT -ne '0') {
+            throw 'Synchronization did not use non-interactive App authentication.'
+        }
+        $global:LASTEXITCODE = 0
+        if ($script:mode -eq 'sync-rejected') { $global:LASTEXITCODE = 1; return }
+        if ($script:mode -ne 'sync-unconfirmed') { $script:remoteCommit = $env:BITBUCKET_COMMIT }
+    }
     function Invoke-GitHubCli([string[]]$Arguments) {
         $command = $Arguments[0] + ' ' + $Arguments[1]
         if ($command -eq 'api repos/fixture/product/git/ref/heads/master') {
-            return (@{ object = @{ type = 'commit'; sha = $env:BITBUCKET_COMMIT } } | ConvertTo-Json)
+            return (@{ object = @{ type = 'commit'; sha = $script:remoteCommit } } | ConvertTo-Json)
         }
         if ($command -eq 'api repos/fixture/product/git/refs') {
             if (-not $script:signatureChecked) { throw 'Unsigned upload attempted.' }
+            if ($script:remoteCommit -ne $env:BITBUCKET_COMMIT) { throw 'Release before synchronization.' }
             $script:tagCommit = ($Arguments | Where-Object { $_ -like 'sha=*' }).Substring(4)
             if ('ref=refs/tags/provdesk-1.5.0-build.19' -notin $Arguments) { throw 'Incorrect release tag.' }
             return '{}'
@@ -52,26 +75,30 @@ try {
         if ($command -eq 'release edit') { $script:draft = $false; $script:published = $true; return '' }
         throw "Unexpected fixture request: $command"
     }
-    foreach ($script:mode in @('success', 'invalid-signature', 'asset-mismatch')) {
+    foreach ($script:mode in @('success', 'invalid-signature', 'asset-mismatch', 'sync-rejected', 'sync-unconfirmed')) {
+        $script:remoteCommit = 'b' * 40
+        $script:pushAttempted = $false
         $script:signatureChecked = $false
         $script:published = $false
         $script:draft = $false
         $script:tagCommit = ''
         $script:assets = @()
         $failed = $false
+        Assert-GitHubReleaseAccess
         try { Publish-SignedGitHubRelease $fixture } catch { $failed = $true }
         if ($script:mode -eq 'success') {
-            if ($failed -or -not $script:published -or $script:draft -or $script:tagCommit -ne $env:BITBUCKET_COMMIT) {
+            if ($failed -or -not $script:pushAttempted -or -not $script:published -or $script:draft -or $script:tagCommit -ne $env:BITBUCKET_COMMIT) {
                 throw 'Signed release was not published for the built commit.'
             }
             if (($script:assets.name | Sort-Object) -join ',' -cne 'build.json,ProVdesk-1.5.0-windows-x86_64.exe,ProVdesk-1.5.0-windows-x86_64.exe.sha256,THIRD-PARTY.txt') {
                 throw 'Unexpected release assets.'
             }
         } elseif (-not $failed -or $script:published) { throw 'Invalid release was published.' }
-        if ($script:mode -eq 'invalid-signature' -and $script:tagCommit) { throw 'Invalid signature changed the remote.' }
+        if ($script:mode -eq 'invalid-signature' -and ($script:pushAttempted -or $script:tagCommit)) { throw 'Invalid signature changed the remote.' }
+        if ($script:mode -like 'sync-*' -and (-not $script:pushAttempted -or $script:tagCommit)) { throw 'Failed synchronization did not block release creation.' }
         if ($script:mode -eq 'asset-mismatch' -and -not $script:draft) { throw 'Failed upload did not remain a draft.' }
     }
-    Write-Host 'Signed GitHub release, signature refusal and failed asset verification passed (local fixtures).'
+    Write-Host 'Signed build synchronization, push refusal, remote verification and release checks passed (offline fixtures).'
 } finally {
     foreach ($name in $saved.Keys) { [Environment]::SetEnvironmentVariable($name, $saved[$name]) }
 }

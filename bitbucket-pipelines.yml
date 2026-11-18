@@ -6,7 +6,7 @@
 # SIGNING_THUMBPRINT, MSBUILD_PATH and LIBCLANG_PATH.
 # SMB: ARTIFACTS_SHARING_HOST, ARTIFACTS_SHARING_USER and secured ARTIFACTS_SHARING_PASSWORD.
 # GitHub on master: gh CLI, Git for Windows OpenSSL and an organization-owned GitHub App.
-# Set GITHUB_APP_CLIENT_ID and secured GITHUB_APP_PRIVATE_KEY_BASE64 (Contents: write).
+# Set GITHUB_APP_CLIENT_ID and secured GITHUB_APP_PRIVATE_KEY_BASE64 (Contents/Workflows: write).
 # GH_TOKEN is generated temporarily by CI; do not configure a personal access token.
 # Optional GITHUB_RELEASE_REPOSITORY defaults to wanpulse-sas/provdesk.
 # Store SIGNING_CONTAINER and SIGNING_PASSWORD as secured variables.

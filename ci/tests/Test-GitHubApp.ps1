@@ -46,7 +46,8 @@ try {
         }
         if ($Method -eq 'Post' -and $Uri -eq 'https://api.github.com/app/installations/123/access_tokens') {
             $request = $Body | ConvertFrom-Json
-            if (@($request.repositories).Count -ne 1 -or $request.repositories[0] -ne 'product' -or $request.permissions.contents -ne 'write') {
+            if (@($request.repositories).Count -ne 1 -or $request.repositories[0] -ne 'product' -or
+                $request.permissions.contents -ne 'write' -or $request.permissions.workflows -ne 'write') {
                 throw 'Token is not scoped to the release repository.'
             }
             $script:issued++

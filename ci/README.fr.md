@@ -3,9 +3,10 @@
 [English](README.md)
 
 Compilation complète du client Windows depuis **le commit du checkout Bitbucket**,
-avec signature par le **framework de signature de WanPulse SAS**. Un push sur `master` lance
-automatiquement la compilation, la signature, la release GitHub puis la publication
-de l'EXE final sur le partage produit. La même étape est disponible manuellement
+avec signature par le **framework de signature de WanPulse SAS**. Un push sur `master` dans Bitbucket lance
+automatiquement la compilation, la signature, la synchronisation du commit vérifié
+sur GitHub `master`, la release GitHub puis la sauvegarde de l'EXE final sur le partage SMB.
+La même étape est disponible manuellement
 via `provdesk-build-sign-package` sur toute branche. Seule `master` publie ; les
 autres branches conservent les artefacts signés dans Bitbucket uniquement.
 Aucun paramètre de publication n'est nécessaire.
@@ -242,7 +243,7 @@ Une liste exhaustive d'hôtes transitifs dépend du baseline et des redirections
 powershell -NoProfile -File ci/Test-Runner.ps1
 ```
 
-Sur `master`, le précontrôle vérifie l'accès GitHub et le commit source, puis
+Sur `master`, le précontrôle vérifie l'accès GitHub sans exiger des branches identiques, puis
 l'accès SMB avec des fichiers temporaires. Sur toutes les branches, il
 peut télécharger l'intégration MSBuild privée verrouillée ; il ne
 compile rien, ne signe rien et n'utilise pas la clé privée.
@@ -273,7 +274,7 @@ artefacts Bitbucket. Il n'y a pas de variable de publication. Les deux publicati
 interviennent après la vérification de la signature finale.
 
 Installer GitHub CLI officiel (`gh`) dans le PATH du runner Windows. L'authentification
-utilise une GitHub App appartenant à l'organisation, avec **Contents: write**, installée
+utilise une GitHub App appartenant à l'organisation, avec **Contents: write** et **Workflows: write**, installée
 uniquement sur le dépôt de publication. OpenSSL fourni par Git for Windows, dans
 `<installation Git>/usr/bin/openssl.exe`, signe le JWT sous PowerShell 5.1 ; aucun
 module PowerShell supplémentaire n'est nécessaire.
@@ -288,7 +289,7 @@ Configurer ces **variables du dépôt Bitbucket** :
 
 Ne pas configurer de `GH_TOKEN` personnel ni lancer `gh auth login` sur le runner.
 Sur `master`, la CI découvre l'installation de l'App pour le dépôt cible et demande
-un jeton limité à ce dépôt et à `contents:write`. Un `GH_TOKEN` temporaire sert au
+un jeton limité à ce dépôt et à `contents:write` / `workflows:write`. Un `GH_TOKEN` temporaire sert au
 précontrôle, puis un nouveau jeton à la publication : les jetons d'installation
 expirent après une heure et un build peut durer davantage. Chaque session tente
 de révoquer son jeton dans `finally` et restaure l'environnement précédent. Les autres
@@ -300,7 +301,7 @@ sur disque. Les clés et jetons ne doivent jamais être ajoutés aux artefacts o
 
 Créer l'App dans **wanpulse-sas → Settings → Developer settings → GitHub Apps**.
 Désactiver les webhooks, laisser les URL callback/setup vides et ne pas demander
-d'autorisation OAuth utilisateur. Accorder uniquement **Contents: read and write**
+d'autorisation OAuth utilisateur. Accorder **Contents: read and write** et **Workflows: read and write**
 (Metadata read est automatique), et autoriser l'installation seulement dans cette
 organisation. Générer une clé privée et installer l'App sur le fork prévu. L'identifiant
 d'installation est découvert automatiquement. Pour copier la clé sur une seule ligne
@@ -312,10 +313,18 @@ sans l'afficher dans PowerShell :
 
 Coller cette valeur dans la variable Bitbucket sécurisée, puis vider le presse-papiers
 avec `Set-Clipboard -Value ''`. Conserver le PEM original dans votre coffre de secrets.
-Le runner doit accéder à `api.github.com`, `uploads.github.com` et aux hôtes d'artefacts GitHub.
-Sur master, le précontrôle vérifie l'accès GitHub et exige que son commit master
-corresponde à `BITBUCKET_COMMIT`. Il obtient un jeton Contents-write sans tester l'envoi d'une release.
-Il est répété avant publication ; un master GitHub plus récent bloque un ancien build.
+Le runner doit accéder à `github.com`, `api.github.com`, `uploads.github.com` et aux hôtes d'artefacts GitHub.
+Approuver le droit Workflows ajouté sur l'installation de l'App avant d'activer cette CI :
+il permet de synchroniser les commits qui modifient `.github/workflows`. Les règles de branche
+doivent autoriser l'App à mettre à jour `master` ; la CI ne les modifie ni ne les contourne.
+Sur `master`, le précontrôle vérifie les accès sans modifier GitHub. Après vérification de
+l'installateur signé, du manifeste et du SHA256, la CI pousse exactement `BITBUCKET_COMMIT`
+sur GitHub `master`, sans forçage ni tags supplémentaires, puis vérifie le SHA distant avant la release.
+Avant synchronisation, la CI complète l'historique depuis Bitbucket si le checkout est superficiel,
+pour couvrir un retard important de GitHub. Les branches de validation gardent le checkout actuel.
+Git utilise le jeton temporaire via `gh auth git-credential`, sans enregistrer d'identifiants.
+Un push refusé ou un SHA distant différent bloque les deux publications. Un échec ultérieur
+de release ou de sauvegarde SMB ne fait pas reculer GitHub : son commit a déjà passé le build signé.
 
 `Publish-GitHubRelease.ps1` réutilise les contrôles de signature de WanPulse SAS existants,
 vérifie la version, le SHA-256 et le manifeste du build courant, puis crée le tag
@@ -536,33 +545,24 @@ la désinstallation et les détections Defender avec l'installateur signé.
 
 ## Dépôts et runner
 
-GitHub héberge les sources et la CI. Bitbucket exécute le même commit Git sur un
+Bitbucket héberge toutes les branches et exécute le commit Git sélectionné sur un
 runner Windows portant les labels `self.hosted`, `windows`, `capability.build`
 et `capability.sign`. Les paramètres de signature et de publication sont fournis
 par les variables Bitbucket et la configuration du runner ; les secrets ne sont
-pas versionnés. Vérifier l'égalité des commits des deux dépôts avant de lancer
-un pipeline. Les workflows GitHub Actions ne sont pas nécessaires à ce circuit.
+pas versionnés. GitHub héberge uniquement la branche `master` après validation du build
+signé, ainsi que les tags de release et les releases. Les workflows GitHub Actions ne sont pas nécessaires à ce circuit.
 
-## Envoyer une branche vers GitHub et Bitbucket
+## Envoyer les branches uniquement vers Bitbucket
 
-Un seul clone local suffit. Configurer un remote `publish` avec deux destinations
-de push, en remplaçant les URL d'exemple par celles des dépôts :
+Pousser toutes les branches, y compris `master`, uniquement sur Bitbucket. Utiliser
+explicitement l'URL Bitbucket si le clone possède encore un remote à double destination :
 
 ```powershell
-git remote add publish <URL_GITHUB>
-git remote set-url --add --push publish <URL_GITHUB>
-git remote set-url --add --push publish <URL_BITBUCKET>
+git push <URL_BITBUCKET> HEAD
 ```
 
-Après modification et commit, `git push publish HEAD` envoie la branche courante
-aux deux dépôts. Pour limiter `git push publish` à une branche précise, configurer
-`remote.publish.push` avec `refs/heads/<branche>:refs/heads/<branche>`.
-Cette configuration est locale au clone et nécessite les droits d'écriture sur
-les deux services. Les deux envois ne sont pas atomiques : en cas d'échec partiel,
-comparer les SHA avec `git ls-remote <URL> refs/heads/<branche>`, puis terminer
-l'envoi manquant sans forcer une divergence. Récupérer localement les changements
-faits directement sur un site avant de pousser.
-
-Pour `master`, pousser sur GitHub avant Bitbucket : le push Bitbucket lance
-automatiquement le build et la publication, et master sur GitHub doit déjà
-correspondre au commit construit.
+Les branches de travail restent exclusivement sur Bitbucket. Ne pas utiliser de remote à double push.
+Seule `master` est synchronisée sur GitHub par la CI après réussite du build signé,
+avant la release et la sauvegarde SMB. Les tags de release restent créés sur GitHub.
+Si le build ou la signature échoue, GitHub reste inchangé. Une divergence doit être
+résolue explicitement avant une nouvelle tentative, sans forcer le push de la CI.

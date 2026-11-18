@@ -39,7 +39,7 @@ Publication depends only on the branch; no publication parameter is required.
 
 | Branch | Output |
 | --- | --- |
-| `master` | Signed GitHub release, then final EXE published to SMB; Bitbucket artifacts retained |
+| `master` | GitHub branch synchronized after signed build verification, then GitHub release and SMB backup; Bitbucket artifacts retained |
 | Other branches | Signed Bitbucket artifacts only; no GitHub or SMB publication |
 
 GitHub releases contain `ProVdesk-<version>-windows-x86_64.exe`, its `.sha256` and `build.json`,
@@ -59,8 +59,9 @@ Validate installation, upgrades and remote sessions in a VM before distribution.
 
 Clone this repository with its submodules (`git clone --recurse-submodules <REPOSITORY_URL>`).
 Read the [development guidelines](AGENTS.md) and CI guides before changing sources
-or dependencies. The CI guide explains how to configure one clone to push to both
-GitHub and Bitbucket.
+or dependencies. Push all branches only to Bitbucket. GitHub hosts only the `master`
+branch, synchronized by CI after a successful signed build, along with release tags
+and releases. See the CI guide for this workflow.
 
 ProVdesk retains copyright notices from RustDesk and its dependencies.
 Make the corresponding sources, patches and license available with every

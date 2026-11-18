@@ -61,10 +61,10 @@ function Invoke-GitHubAppSession([scriptblock]$Action) {
     }
     try {
         $installation = Invoke-RestMethod -Method Get -Uri "https://api.github.com/repos/$repository/installation" -Headers $headers -ErrorAction Stop
-        $body = @{ repositories = @($repository.Split('/')[1]); permissions = @{ contents = 'write' } } | ConvertTo-Json -Depth 3 -Compress
+        $body = @{ repositories = @($repository.Split('/')[1]); permissions = @{ contents = 'write'; workflows = 'write' } } | ConvertTo-Json -Depth 3 -Compress
         $response = Invoke-RestMethod -Method Post -Uri "https://api.github.com/app/installations/$($installation.id)/access_tokens" -Headers $headers -ContentType 'application/json' -Body $body -ErrorAction Stop
     } catch {
-        throw 'GitHub App authentication failed. Check the app installation, repository access, Contents: write permission and runner clock/network.'
+        throw 'GitHub App authentication failed. Check the app installation, repository access, Contents/Workflows: write permissions and runner clock/network.'
     }
     if ([string]::IsNullOrWhiteSpace($response.token)) { throw 'GitHub did not return an installation token.' }
     $previousToken = $env:GH_TOKEN

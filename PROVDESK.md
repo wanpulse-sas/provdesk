@@ -54,8 +54,11 @@ See [the English CI guide](ci/README.md) or
 [the French CI guide](ci/README.fr.md) for tool versions, runner configuration,
 required variables and detailed checks.
 
-A push to `master` automatically starts the build and signing pipeline, followed
-by GitHub release publication and SMB publication. The same step can be started
+A push to Bitbucket `master` automatically starts the build and signing pipeline, followed
+by synchronization of the verified commit to GitHub `master`, GitHub release publication
+and SMB backup. Push all branches only to Bitbucket; CI updates only GitHub `master`
+without force. Working branches remain exclusively on Bitbucket.
+The same step can be started
 manually as `provdesk-build-sign-package` on any branch. Only `master` publishes;
 other branches retain signed Bitbucket artifacts without GitHub or SMB publication.
 There is no publication parameter. GitHub and SMB preflight checks run only on `master`.

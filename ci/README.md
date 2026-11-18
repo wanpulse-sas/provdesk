@@ -3,8 +3,9 @@
 [Français](README.fr.md)
 
 Complete Windows client build from **the Bitbucket checkout commit**, signed
-through the **WanPulse SAS signing framework**. A push to `master` automatically builds, signs,
-publishes a GitHub release, then publishes the final EXE to the product share.
+through the **WanPulse SAS signing framework**. A push to Bitbucket `master` automatically builds, signs,
+synchronizes GitHub `master` to the verified commit, publishes a GitHub release,
+then backs up the final EXE to the SMB share.
 The same step is available manually as `provdesk-build-sign-package` on any branch.
 Only `master` publishes; other branches retain signed Bitbucket artifacts only.
 There is no publication parameter. Sources and CI are versioned
@@ -233,7 +234,7 @@ logs rather than assuming a fixed list.
 powershell -NoProfile -File ci/Test-Runner.ps1
 ```
 
-On `master`, preflight checks GitHub access and the source commit, then tests SMB
+On `master`, preflight checks GitHub access without requiring matching branches, then tests SMB
 access using temporary files. On all branches it may download the pinned
 private MSBuild integration; it does not
 compile, sign or use the private key. It checks tools,
@@ -263,7 +264,7 @@ also publish; all other branches retain Bitbucket artifacts only. There is no
 publication variable. Both publication stages run after final signature verification.
 
 Install the official GitHub CLI (`gh`) on the Windows runner PATH. Authentication
-uses an organization-owned GitHub App with **Contents: write**, installed only on
+uses an organization-owned GitHub App with **Contents: write** and **Workflows: write**, installed only on
 the release repository. OpenSSL at `<Git installation>/usr/bin/openssl.exe` signs
 the App JWT under Windows PowerShell 5.1; no additional PowerShell module is required.
 
@@ -277,7 +278,7 @@ Configure these Bitbucket **repository variables**:
 
 Do not configure a personal `GH_TOKEN` or run `gh auth login` on the runner.
 On `master`, CI discovers the App installation for the target repository and
-requests a token restricted to that repository and `contents:write`. A temporary
+requests a token restricted to that repository and `contents:write` / `workflows:write`. A temporary
 `GH_TOKEN` is used for preflight, then a fresh token for publication: installation
 tokens expire after one hour, and builds can take longer. Each session attempts
 to revoke its token in `finally` and restores the prior environment. Other branches
@@ -289,7 +290,7 @@ can leave it behind. Keys and tokens must never be added to artifacts or logs.
 
 Create the App under **wanpulse-sas → Settings → Developer settings → GitHub Apps**.
 Disable webhooks, leave callback/setup URLs empty and do not request user OAuth
-authorization. Grant only **Contents: read and write** (Metadata read is automatic),
+authorization. Grant **Contents: read and write** and **Workflows: read and write** (Metadata read is automatic),
 and allow installation only on this organization. Generate a private key and install
 the App on the intended fork. The installation ID is discovered automatically.
 To copy a single-line key value without printing it in PowerShell:
@@ -300,10 +301,18 @@ To copy a single-line key value without printing it in PowerShell:
 
 Paste it into the secured Bitbucket variable, then clear the clipboard with
 `Set-Clipboard -Value ''`. Keep the original PEM in your secret store.
-The runner needs access to `api.github.com`, `uploads.github.com` and GitHub asset hosts.
-On master, preflight checks GitHub access and requires its master commit to match
-`BITBUCKET_COMMIT`. It obtains a Contents-write token but does not test a release upload. The same
-commit check runs again before publishing; a newer GitHub master blocks an older build.
+The runner needs access to `github.com`, `api.github.com`, `uploads.github.com` and GitHub asset hosts.
+Approve the added Workflows permission on the existing App installation before enabling this CI;
+it allows synchronization of commits that change `.github/workflows`. Branch rules must permit
+the App to update `master`; CI does not bypass or change those rules.
+On `master`, preflight checks access without changing GitHub. After the signed installer,
+manifest and checksum checks pass, CI pushes exactly `BITBUCKET_COMMIT` to GitHub `master`
+without force or extra tags, then verifies the remote SHA before creating the release.
+Before synchronization, CI completes a shallow checkout from Bitbucket so a large GitHub lag
+does not prevent the push. Validation branches keep the existing shallow checkout behavior.
+Git uses the temporary App token through `gh auth git-credential`, without saving credentials.
+A rejected push or mismatched remote SHA stops both publications. A later release or SMB
+failure does not roll back GitHub: its commit has already passed build and signature checks.
 
 `Publish-GitHubRelease.ps1` reuses the existing WanPulse SAS signature checks, verifies
 the installer version, SHA-256 and current build manifest, and creates a tag
@@ -518,31 +527,24 @@ detections in a VM using the signed installer.
 
 ## Repositories and runner
 
-GitHub hosts the sources and CI. Bitbucket runs the same Git commit on a Windows
+Bitbucket hosts all branches and runs the selected Git commit on a Windows
 runner with the `self.hosted`, `windows`, `capability.build` and `capability.sign`
 labels. Signing and publication settings come from Bitbucket variables and the
-runner configuration; secrets are not committed. Check that both repositories
-point to the same commit before starting a pipeline. GitHub Actions workflows
+runner configuration; secrets are not committed. GitHub hosts only the `master`
+branch after signed build verification, plus release tags and releases. GitHub Actions workflows
 are not required for this build process.
 
-## Push a branch to GitHub and Bitbucket
+## Push branches to Bitbucket
 
-A single local clone is sufficient. Configure a `publish` remote with two push
-destinations, replacing the example URLs with the repository URLs:
+Push every branch, including `master`, only to Bitbucket. Use the Bitbucket repository
+URL explicitly if the clone still has a remote configured to push to both services:
 
 ```powershell
-git remote add publish <GITHUB_URL>
-git remote set-url --add --push publish <GITHUB_URL>
-git remote set-url --add --push publish <BITBUCKET_URL>
+git push <BITBUCKET_URL> HEAD
 ```
 
-After editing and committing, `git push publish HEAD` sends the current branch
-to both repositories. To restrict `git push publish` to a specific branch, set
-`remote.publish.push` to `refs/heads/<branch>:refs/heads/<branch>`.
-This configuration is local to the clone and requires write access to both
-services. The two pushes are not atomic: after a partial failure, compare SHAs
-with `git ls-remote <URL> refs/heads/<branch>` and complete the missing push
-without forcing a divergence. Fetch changes made directly on either website
-before pushing.
-For `master`, push to GitHub first, then Bitbucket: the Bitbucket push automatically
-starts building and publishing, and GitHub master must already match the built commit.
+Working branches remain exclusively on Bitbucket. Do not use a dual-push remote.
+Only `master` is synchronized to GitHub by CI after the signed build succeeds,
+before publishing the release and SMB backup. Release tags are still created on GitHub.
+If the build or signing fails, GitHub remains unchanged. Never force the CI push to
+resolve divergent branches; reconcile them explicitly before retrying.

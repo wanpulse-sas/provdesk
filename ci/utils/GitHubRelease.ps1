@@ -24,7 +24,7 @@ function Get-GitHubReleaseRepository {
     return $repository
 }
 
-function Assert-GitHubReleaseAccess {
+function Assert-GitHubReleaseAccess([switch]$RequireBuiltCommit) {
     if ($env:BITBUCKET_BRANCH -cne 'master') { throw 'GitHub publication is restricted to master.' }
     if ($env:BITBUCKET_COMMIT -notmatch '\A[0-9a-fA-F]{40}\z' -or
         [string]::IsNullOrWhiteSpace($env:GH_TOKEN)) {
@@ -32,9 +32,43 @@ function Assert-GitHubReleaseAccess {
     }
     $repository = Get-GitHubReleaseRepository
     $ref = Invoke-GitHubCli -Arguments @('api', "repos/$repository/git/ref/heads/master", '--hostname', 'github.com') | ConvertFrom-Json
-    if ($ref.object.type -ne 'commit' -or $ref.object.sha -ne $env:BITBUCKET_COMMIT) {
+    if ($ref.object.type -ne 'commit') { throw 'GitHub master must reference a commit.' }
+    if ($RequireBuiltCommit -and $ref.object.sha -ne $env:BITBUCKET_COMMIT) {
         throw 'GitHub master must match the Bitbucket build commit before publication.'
     }
+}
+
+function Sync-GitHubMaster {
+    Assert-GitHubReleaseAccess
+    $repository = Get-GitHubReleaseRepository
+    $executable = (Get-Command git -CommandType Application -ErrorAction Stop).Source
+    $previousPreference = $ErrorActionPreference
+    $previousPrompt = $env:GIT_TERMINAL_PROMPT
+    try {
+        $env:GIT_TERMINAL_PROMPT = '0'
+        $ErrorActionPreference = 'Continue'
+        $shallow = & $executable rev-parse --is-shallow-repository 2>&1
+        if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect checkout history before synchronization.' }
+        if ($shallow -eq 'true') {
+            # Complete history only for publication; validation branches keep their shallow checkout.
+            $null = & $executable fetch --unshallow --no-tags origin master 2>&1
+            if ($LASTEXITCODE -ne 0) { throw 'Cannot complete Bitbucket history before synchronization.' }
+        }
+        $global:LASTEXITCODE = $null
+        # Use the scoped App token through gh, without persisting credentials or pushing build patches.
+        $null = & $executable -c http.extraHeader= -c credential.helper= -c 'credential.helper=!gh auth git-credential' `
+            -c credential.interactive=false -c core.askPass= -c push.recurseSubmodules=no `
+            push --no-force --no-follow-tags "https://github.com/$repository.git" "${env:BITBUCKET_COMMIT}:refs/heads/master" 2>&1
+        $code = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousPreference
+        $env:GIT_TERMINAL_PROMPT = $previousPrompt
+    }
+    if ($null -eq $code -or $code -ne 0) {
+        throw "GitHub master synchronization failed (exit $code). Check divergence, App permissions and branch protection; publication stopped."
+    }
+    Assert-GitHubReleaseAccess -RequireBuiltCommit
+    Write-Host "GitHub master synchronized to signed build commit $env:BITBUCKET_COMMIT."
 }
 
 function Publish-SignedGitHubRelease([string]$OutputDirectory) {
@@ -96,6 +130,7 @@ The checksum file and build.json provide download verification and build provena
 "@
     $notesPath = Join-Path $directory.FullName 'release-notes.md'
     [IO.File]::WriteAllText($notesPath, $notes, (New-Object Text.UTF8Encoding($false)))
+    Sync-GitHubMaster
     # Creating the ref fails if it already exists; never move a tag or replace release assets.
     $null = Invoke-GitHubCli -Arguments @('api', "repos/$repository/git/refs", '--hostname', 'github.com',
         '--method', 'POST', '--raw-field', "ref=refs/tags/$tag", '--raw-field', "sha=$($manifest.SourceCommit)")
