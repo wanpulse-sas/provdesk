@@ -506,10 +506,19 @@ impl RendezvousMediator {
                     Ok(register_pk_response::Result::OK) => {
                         Config::set_key_confirmed(true);
                         Config::set_host_key_confirmed(&self.host_prefix, true);
+                        if option_env!("RUSTDESK_APP_NAME") == Some("ProVdesk") {
+                            Config::confirm_provdesk_registration();
+                        }
                         *SOLVING_PK_MISMATCH.lock().await = "".to_owned();
                         NEEDS_DEPLOY.store(false, Ordering::SeqCst);
                         #[cfg(target_os = "android")]
                         reset_needs_deploy_notification();
+                    }
+                    Ok(register_pk_response::Result::UUID_MISMATCH
+                        | register_pk_response::Result::NOT_SUPPORT)
+                        if Config::is_pending_provdesk_registration() =>
+                    {
+                        self.retry_fresh_provdesk_registration(sink).await?;
                     }
                     Ok(register_pk_response::Result::UUID_MISMATCH) => {
                         self.handle_uuid_mismatch(sink).await?;
@@ -1282,6 +1291,26 @@ impl RendezvousMediator {
         socket.send(&msg_out).await?;
         SENT_REGISTER_PK.store(true, Ordering::SeqCst);
         Ok(())
+    }
+
+    async fn retry_fresh_provdesk_registration(&mut self, socket: Sink<'_>) -> ResultType<()> {
+        {
+            let mut solving = SOLVING_PK_MISMATCH.lock().await;
+            if !solving.is_empty() && *solving != self.host {
+                return Ok(());
+            }
+            if !Config::retry_provdesk_registration() {
+                hbb_common::throttled_log!(
+                    Duration::from_secs(60),
+                    error,
+                    "ProVdesk first registration rejected after two ID retries; check server identity records and enrollment policy"
+                );
+                return Ok(());
+            }
+            *solving = self.host.clone();
+        }
+        log::warn!("ProVdesk first registration rejected; retrying with a new ID and the same key pair");
+        self.register_pk(socket).await
     }
 
     async fn handle_uuid_mismatch(&mut self, socket: Sink<'_>) -> ResultType<()> {
