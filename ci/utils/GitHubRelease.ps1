@@ -47,13 +47,6 @@ function Sync-GitHubMaster {
     try {
         $env:GIT_TERMINAL_PROMPT = '0'
         $ErrorActionPreference = 'Continue'
-        $shallow = & $executable rev-parse --is-shallow-repository 2>&1
-        if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect checkout history before synchronization.' }
-        if ($shallow -eq 'true') {
-            # Complete history only for publication; validation branches keep their shallow checkout.
-            $null = & $executable fetch --unshallow --no-tags origin master 2>&1
-            if ($LASTEXITCODE -ne 0) { throw 'Cannot complete Bitbucket history before synchronization.' }
-        }
         $global:LASTEXITCODE = $null
         # Use the scoped App token through gh, without persisting credentials or pushing build patches.
         $null = & $executable -c http.extraHeader= -c credential.helper= -c 'credential.helper=!gh auth git-credential' `

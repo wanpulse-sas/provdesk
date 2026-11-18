@@ -30,11 +30,6 @@ try {
     function Invoke-FixtureGit {
         if (-not $script:signatureChecked) { throw 'Synchronization before signature verification.' }
         $global:LASTEXITCODE = 0
-        if ($args[0] -eq 'rev-parse') { return 'true' }
-        if ($args[0] -eq 'fetch') {
-            if (($args -join ' ') -cne 'fetch --unshallow --no-tags origin master') { throw 'Unexpected history fetch.' }
-            return
-        }
         $script:pushAttempted = $true
         if ('--no-force' -notin $args -or '--no-follow-tags' -notin $args -or
             $args[-2] -cne 'https://github.com/fixture/product.git' -or

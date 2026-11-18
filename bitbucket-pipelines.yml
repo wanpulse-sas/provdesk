@@ -19,6 +19,8 @@ pipelines:
     master:
       - step: &signed-build
           name: Build, sign and package ProVdesk
+          clone:
+            depth: full
           runs-on:
             - self.hosted
             - windows

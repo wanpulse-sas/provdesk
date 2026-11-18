@@ -320,8 +320,9 @@ doivent autoriser l'App à mettre à jour `master` ; la CI ne les modifie ni ne 
 Sur `master`, le précontrôle vérifie les accès sans modifier GitHub. Après vérification de
 l'installateur signé, du manifeste et du SHA256, la CI pousse exactement `BITBUCKET_COMMIT`
 sur GitHub `master`, sans forçage ni tags supplémentaires, puis vérifie le SHA distant avant la release.
-Avant synchronisation, la CI complète l'historique depuis Bitbucket si le checkout est superficiel,
-pour couvrir un retard important de GitHub. Les branches de validation gardent le checkout actuel.
+L'étape de build partagée utilise `clone: depth: full`, y compris pour les validations manuelles.
+Bitbucket récupère l'historique complet lors du checkout initial authentifié ; la publication
+ne refait aucun fetch Bitbucket. Cela peut augmenter la durée du checkout et l'espace disque utilisé.
 Git utilise le jeton temporaire via `gh auth git-credential`, sans enregistrer d'identifiants.
 Un push refusé ou un SHA distant différent bloque les deux publications. Un échec ultérieur
 de release ou de sauvegarde SMB ne fait pas reculer GitHub : son commit a déjà passé le build signé.
