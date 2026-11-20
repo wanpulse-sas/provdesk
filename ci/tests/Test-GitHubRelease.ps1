@@ -42,17 +42,17 @@ try {
         }
         $global:LASTEXITCODE = 0
         if ($script:mode -eq 'sync-rejected') { $global:LASTEXITCODE = 1; return }
-        if ($script:mode -ne 'sync-unconfirmed') { $script:remoteCommit = $env:BITBUCKET_COMMIT }
     }
     function Invoke-GitHubCli([string[]]$Arguments) {
         $command = $Arguments[0] + ' ' + $Arguments[1]
         if ($command -eq 'api repos/fixture/product/git/ref/heads/master') {
-            return (@{ object = @{ type = 'commit'; sha = $script:remoteCommit } } | ConvertTo-Json)
+            if ($script:pushAttempted) { throw 'Unexpected GitHub master read after push.' }
+            return (@{ object = @{ type = 'commit'; sha = 'b' * 40 } } | ConvertTo-Json)
         }
         if ($command -eq 'api repos/fixture/product/git/refs') {
             if (-not $script:signatureChecked) { throw 'Unsigned upload attempted.' }
-            if ($script:remoteCommit -ne $env:BITBUCKET_COMMIT) { throw 'Release before synchronization.' }
             $script:tagCommit = ($Arguments | Where-Object { $_ -like 'sha=*' }).Substring(4)
+            if (-not $script:pushAttempted) { throw 'Tag creation before push.' }
             if ('ref=refs/tags/provdesk-1.5.0.19' -notin $Arguments) { throw 'Incorrect release tag.' }
             return '{}'
         }
@@ -72,8 +72,7 @@ try {
         if ($command -eq 'release edit') { $script:draft = $false; $script:published = $true; return '' }
         throw "Unexpected fixture request: $command"
     }
-    foreach ($script:mode in @('success', 'invalid-signature', 'asset-mismatch', 'sync-rejected', 'sync-unconfirmed')) {
-        $script:remoteCommit = 'b' * 40
+    foreach ($script:mode in @('success', 'invalid-signature', 'asset-mismatch', 'sync-rejected')) {
         $script:pushAttempted = $false
         $script:signatureChecked = $false
         $script:published = $false
@@ -92,7 +91,7 @@ try {
             }
         } elseif (-not $failed -or $script:published) { throw 'Invalid release was published.' }
         if ($script:mode -eq 'invalid-signature' -and ($script:pushAttempted -or $script:tagCommit)) { throw 'Invalid signature changed the remote.' }
-        if ($script:mode -like 'sync-*' -and (-not $script:pushAttempted -or $script:tagCommit)) { throw 'Failed synchronization did not block release creation.' }
+        if ($script:mode -eq 'sync-rejected' -and (-not $script:pushAttempted -or $script:tagCommit)) { throw 'Failed synchronization did not block release creation.' }
         if ($script:mode -eq 'asset-mismatch' -and -not $script:draft) { throw 'Failed upload did not remain a draft.' }
     }
     $script:mode = 'success'
@@ -110,7 +109,7 @@ try {
             throw "Expected version $invalidVersion to be rejected before synchronization."
         }
     }
-    Write-Host 'Signed build synchronization, push refusal, remote verification and release checks passed (offline fixtures).'
+    Write-Host 'Signed build synchronization, push refusal and release checks passed (offline fixtures).'
 } finally {
     foreach ($name in $saved.Keys) { [Environment]::SetEnvironmentVariable($name, $saved[$name]) }
 }

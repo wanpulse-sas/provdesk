@@ -307,12 +307,12 @@ it allows synchronization of commits that change `.github/workflows`. Branch rul
 the App to update `master`; CI does not bypass or change those rules.
 On `master`, preflight checks access without changing GitHub. After the signed installer,
 manifest and checksum checks pass, CI pushes exactly `BITBUCKET_COMMIT` to GitHub `master`
-without force or extra tags, then verifies the remote SHA before creating the release.
+without force or extra tags, then creates the release tag on the signed build's source commit.
 The shared build step uses `clone: depth: full`, including manual validation runs.
 Bitbucket downloads the complete history during its authenticated initial checkout;
 publication does not fetch from Bitbucket again. This can increase checkout time and disk usage.
 Git uses the temporary App token through `gh auth git-credential`, without saving credentials.
-A rejected push or mismatched remote SHA stops both publications. A later release or SMB
+A rejected push stops both publications. A later release or SMB
 failure does not roll back GitHub: its commit has already passed build and signature checks.
 
 `Publish-GitHubRelease.ps1` reuses the existing WanPulse SAS signature checks, verifies

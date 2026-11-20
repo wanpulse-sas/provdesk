@@ -24,7 +24,7 @@ function Get-GitHubReleaseRepository {
     return $repository
 }
 
-function Assert-GitHubReleaseAccess([switch]$RequireBuiltCommit) {
+function Assert-GitHubReleaseAccess {
     if ($env:BITBUCKET_BRANCH -cne 'master') { throw 'GitHub publication is restricted to master.' }
     if ($env:BITBUCKET_COMMIT -notmatch '\A[0-9a-fA-F]{40}\z' -or
         [string]::IsNullOrWhiteSpace($env:GH_TOKEN)) {
@@ -33,9 +33,6 @@ function Assert-GitHubReleaseAccess([switch]$RequireBuiltCommit) {
     $repository = Get-GitHubReleaseRepository
     $ref = Invoke-GitHubCli -Arguments @('api', "repos/$repository/git/ref/heads/master", '--hostname', 'github.com') | ConvertFrom-Json
     if ($ref.object.type -ne 'commit') { throw 'GitHub master must reference a commit.' }
-    if ($RequireBuiltCommit -and $ref.object.sha -ne $env:BITBUCKET_COMMIT) {
-        throw 'GitHub master must match the Bitbucket build commit before publication.'
-    }
 }
 
 function Sync-GitHubMaster {
@@ -60,7 +57,6 @@ function Sync-GitHubMaster {
     if ($null -eq $code -or $code -ne 0) {
         throw "GitHub master synchronization failed (exit $code). Check divergence, App permissions and branch protection; publication stopped."
     }
-    Assert-GitHubReleaseAccess -RequireBuiltCommit
     Write-Host "GitHub master synchronized to signed build commit $env:BITBUCKET_COMMIT."
 }
 
