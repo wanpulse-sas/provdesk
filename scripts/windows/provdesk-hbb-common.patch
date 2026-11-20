@@ -11,7 +11,7 @@ index 43e3282..b2340ce 100644
  
      std::fs::create_dir_all(&out_dir).unwrap();
 diff --git a/src/config.rs b/src/config.rs
-index 6fe1004..7480407 100644
+index 6fe1004..4b2cd91 100644
 --- a/src/config.rs
 +++ b/src/config.rs
 @@ -11,7 +11,7 @@ use std::{
@@ -45,25 +45,64 @@ index 6fe1004..7480407 100644
  #[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]
  pub struct Config {
      #[serde(
-@@ -223,6 +229,8 @@ pub struct Config {
+@@ -221,6 +227,8 @@ pub struct Config {
+     key_pair: KeyPair, // sk, pk
+     #[serde(default, deserialize_with = "deserialize_bool")]
      key_confirmed: bool,
-     #[serde(default, deserialize_with = "deserialize_hashmap_string_bool")]
-     keys_confirmed: HashMap<String, bool>,
 +    #[serde(default, skip_serializing_if = "Option::is_none")]
 +    provdesk_registration_retries: Option<u8>,
+     #[serde(default, deserialize_with = "deserialize_hashmap_string_bool")]
+     keys_confirmed: HashMap<String, bool>,
  }
- 
- #[derive(Debug, Default, PartialEq, Serialize, Deserialize, Clone)]
-@@ -608,7 +616,7 @@ impl Config {
+@@ -459,6 +467,23 @@ pub fn get_online_state() -> i64 {
+ #[cfg(not(any(target_os = "android", target_os = "ios")))]
+ fn patch(path: PathBuf) -> PathBuf {
+     if let Some(_tmp) = path.to_str() {
++        #[cfg(windows)]
++        if option_env!("RUSTDESK_APP_NAME") == Some("ProVdesk") {
++            let profile = r"\system32\config\systemprofile\";
++            if let Some(i) = _tmp.to_ascii_lowercase().find(profile) {
++                // Older builds redirected only the exact lower-case profile spelling.
++                // Keep an existing installation in the profile it already used.
++                if !_tmp.contains(&profile[1..profile.len() - 1])
++                    && Path::new(&_tmp[..i + profile.len()])
++                        .join(r"AppData\Roaming\ProVdesk\config\ProVdesk.toml").is_file()
++                {
++                    return path;
++                }
++                let mut path = _tmp.to_owned();
++                path.replace_range(i..i + profile.len(), r"\ServiceProfiles\LocalService\");
++                return path.into();
++            }
++        }
+         #[cfg(windows)]
+         return _tmp
+             .replace(
+@@ -607,8 +632,21 @@ impl Config {
+     }
  
      fn load() -> Config {
-         let mut config = Config::load_::<Config>("");
+-        let mut config = Config::load_::<Config>("");
 -        let mut store = false;
++        #[cfg(windows)]
++        let mut config = if option_env!("RUSTDESK_APP_NAME") == Some("ProVdesk") {
++            match Self::provdesk_config_at(&Self::file()) {
++                Ok(config) => config,
++                Err(err) => {
++                    log::error!("Cannot load ProVdesk identity: {err}");
++                    return Config::default();
++                }
++            }
++        } else {
++            Self::load_::<Config>("")
++        };
++        #[cfg(not(windows))]
++        let mut config = Self::load_::<Config>("");
 +        let mut store = config.initialize_provdesk_identity();
          if let Err(err) = Self::validate_or_decrypt_permanent_password_storage(&mut config) {
              log::error!("Failed to validate or decrypt permanent password storage: {err}");
          }
-@@ -915,6 +923,9 @@ impl Config {
+@@ -915,6 +953,9 @@ impl Config {
          if rendezvous_server.is_empty() {
              rendezvous_server = PROD_RENDEZVOUS_SERVER.read().unwrap().clone();
          }
@@ -73,7 +112,7 @@ index 6fe1004..7480407 100644
          if rendezvous_server.is_empty() {
              rendezvous_server = CONFIG2.read().unwrap().rendezvous_server.clone();
          }
-@@ -943,6 +954,9 @@ impl Config {
+@@ -943,6 +984,9 @@ impl Config {
          if !s.is_empty() {
              return vec![s];
          }
@@ -83,7 +122,7 @@ index 6fe1004..7480407 100644
          let serial_obsolute = CONFIG2.read().unwrap().serial > SERIAL;
          if serial_obsolute {
              let ss: Vec<String> = Self::get_option("rendezvous-servers")
-@@ -987,6 +1001,9 @@ impl Config {
+@@ -987,6 +1031,9 @@ impl Config {
          if id == config.id {
              return;
          }
@@ -93,10 +132,83 @@ index 6fe1004..7480407 100644
          config.id = id.into();
          config.store();
      }
-@@ -1069,6 +1086,75 @@ impl Config {
+@@ -1069,6 +1116,148 @@ impl Config {
          }
      }
  
++    #[cfg(windows)]
++    pub fn provdesk_id_at(file: &Path) -> Result<String> {
++        let config = Self::provdesk_config_at(file)?;
++        if config.enc_id.is_empty() {
++            return Ok(config.id);
++        }
++        let (id, decrypted, _) = decrypt_str_or_original(&config.enc_id, PASSWORD_ENC_VERSION);
++        anyhow::ensure!(
++            decrypted && !id.is_empty(),
++            "Unable to decrypt the stored ProVdesk ID"
++        );
++        Ok(id)
++    }
++
++    #[cfg(windows)]
++    fn provdesk_config_at(file: &Path) -> Result<Config> {
++        use std::os::windows::fs::OpenOptionsExt;
++
++        fn read(file: &Path) -> Result<Config> {
++            match fs::read_to_string(file) {
++                Ok(data) => Ok(toml::from_str(&data)?),
++                Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(Config::default()),
++                Err(err) => Err(err.into()),
++            }
++        }
++
++        let config = read(file)?;
++        if !config.id.is_empty() || !config.enc_id.is_empty() {
++            return Ok(config);
++        }
++        fs::create_dir_all(
++            file.parent()
++                .ok_or_else(|| anyhow!("Missing config directory"))?,
++        )?;
++        // Windows releases the exclusive handle even if the initializing process exits.
++        let lock_path = file.with_extension("identity.lock");
++        let started = Instant::now();
++        let _guard = loop {
++            match fs::OpenOptions::new()
++                .write(true)
++                .create(true)
++                .truncate(false)
++                .share_mode(0)
++                .open(&lock_path)
++            {
++                Ok(lock) => break lock,
++                Err(err)
++                    if err.raw_os_error() == Some(32)
++                        && started.elapsed() < Duration::from_secs(3) =>
++                {
++                    std::thread::sleep(Duration::from_millis(20));
++                }
++                Err(err) => return Err(err.into()),
++            }
++        };
++        let mut config = read(file)?;
++        if config.initialize_provdesk_identity() {
++            // Without a machine UID, encryption falls back to this process's key pair.
++            // Keep the supported plain ID until the host can store it with its own key.
++            if machine_uid::get().is_ok() {
++                config.enc_id =
++                    encrypt_str_or_original(&config.id, PASSWORD_ENC_VERSION, ENCRYPT_MAX_LEN);
++                anyhow::ensure!(
++                    config.enc_id != config.id && !config.enc_id.is_empty(),
++                    "Unable to encrypt ProVdesk ID"
++                );
++                config.id.clear();
++            }
++            store_path(file.to_owned(), &config)?;
++        }
++        Ok(config)
++    }
++
 +    fn new_provdesk_id() -> String {
 +        let mut rng = rand::thread_rng();
 +        let index = rng.gen_range(0..52u8);
@@ -169,10 +281,50 @@ index 6fe1004..7480407 100644
      pub fn get_auto_password(length: usize) -> String {
          Self::get_auto_password_with_chars(length, CHARS)
      }
-@@ -2940,6 +3026,78 @@ impl Status {
+@@ -1199,7 +1388,7 @@ impl Config {
+ 
+     pub fn get_id() -> String {
+         let mut id = CONFIG.read().unwrap().id.clone();
+-        if id.is_empty() {
++        if id.is_empty() && !(cfg!(windows) && option_env!("RUSTDESK_APP_NAME") == Some("ProVdesk")) {
+             if let Some(tmp) = Config::gen_id() {
+                 id = tmp;
+                 Config::set_id(&id);
+@@ -2940,6 +3129,109 @@ impl Status {
  mod tests {
      use super::{permanent_password::PERMANENT_PASSWORD_ENC_VERSION, *};
  
++    #[cfg(windows)]
++    #[test]
++    fn provdesk_offline_first_read_agrees_with_concurrent_startup() {
++        if option_env!("RUSTDESK_APP_NAME") != Some("ProVdesk") {
++            return;
++        }
++        let dir = std::env::temp_dir().join(uuid::Uuid::new_v4().to_string());
++        let path = dir.join("ProVdesk.toml");
++        let barrier = std::sync::Barrier::new(4);
++        std::thread::scope(|scope| {
++            let handles: Vec<_> = (0..4)
++                .map(|_| {
++                    scope.spawn(|| {
++                        barrier.wait();
++                        Config::provdesk_id_at(&path).unwrap()
++                    })
++                })
++                .collect();
++            let ids: Vec<_> = handles.into_iter().map(|h| h.join().unwrap()).collect();
++            assert_eq!(ids[0].len(), 15);
++            assert!(ids.iter().all(|id| id == &ids[0]));
++            assert_eq!(Config::provdesk_id_at(&path).unwrap(), ids[0]);
++        });
++        fs::write(&path, "id = '123456789'").unwrap();
++        assert_eq!(Config::provdesk_id_at(&path).unwrap(), "123456789");
++        fs::write(&path, "broken = [").unwrap();
++        assert!(Config::provdesk_id_at(&path).is_err());
++        assert_eq!(fs::read_to_string(&path).unwrap(), "broken = [");
++        fs::remove_dir_all(dir).unwrap();
++    }
++
 +    #[test]
 +    fn provdesk_random_identity_requires_no_previous_id() {
 +        if option_env!("RUSTDESK_APP_NAME") != Some("ProVdesk") {
@@ -248,7 +400,7 @@ index 6fe1004..7480407 100644
      static CONFIG_STATE_TEST_LOCK: Mutex<()> = Mutex::new(());
  
      struct ConfigStateTestGuard {
-@@ -3005,6 +3163,24 @@ mod tests {
+@@ -3005,6 +3297,24 @@ mod tests {
          test()
      }
  

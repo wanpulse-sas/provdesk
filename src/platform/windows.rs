@@ -116,6 +116,7 @@ pub const FLUTTER_RUNNER_WIN32_WINDOW_CLASS: &'static str = "FLUTTER_RUNNER_WIN3
 pub const EXPLORER_EXE: &'static str = "explorer.exe";
 pub const SET_FOREGROUND_WINDOW: &'static str = "SET_FOREGROUND_WINDOW";
 
+const INSTALL_WITHOUT_SHORTCUTS: &str = "no-shortcuts";
 const REG_NAME_INSTALL_DESKTOPSHORTCUTS: &str = "DESKTOPSHORTCUTS";
 const REG_NAME_INSTALL_STARTMENUSHORTCUTS: &str = "STARTMENUSHORTCUTS";
 pub const REG_NAME_INSTALL_PRINTER: &str = "PRINTER";
@@ -1357,8 +1358,43 @@ pub fn get_install_options() -> String {
     serde_json::to_string(&opts).unwrap_or("{}".to_owned())
 }
 
+pub fn installed_provdesk_id() -> ResultType<String> {
+    use std::os::windows::ffi::OsStringExt;
+    use windows::Win32::System::SystemInformation::GetSystemWindowsDirectoryW;
+
+    if is_root() {
+        return Config::provdesk_id_at(&Config::file());
+    }
+    // A standard user normally cannot read the service profile.
+    if let Ok(Some(id)) = crate::ipc::get_config("provdesk-service-id") {
+        if !id.is_empty() {
+            return Ok(id);
+        }
+    }
+    let mut dir = [0u16; 260];
+    let len = unsafe { GetSystemWindowsDirectoryW(Some(&mut dir)) } as usize;
+    if len == 0 || len >= dir.len() {
+        bail!("Unable to resolve the Windows service profile directory");
+    }
+    let windows_dir = std::path::PathBuf::from(std::ffi::OsString::from_wide(&dir[..len]));
+    let config = r"AppData\Roaming\ProVdesk\config\ProVdesk.toml";
+    let file = windows_dir.join(r"ServiceProfiles\LocalService").join(config);
+    let legacy = windows_dir.join(r"System32\config\systemprofile").join(config);
+    if legacy.try_exists()? {
+        if file.try_exists()? {
+            bail!("Multiple service profiles contain an ID; query the running host or run as SYSTEM");
+        }
+        return Config::provdesk_id_at(&legacy);
+    }
+    Config::provdesk_id_at(&file)
+}
+
 pub fn get_silent_install_options(_printer_override: Option<bool>) -> &'static str {
-    "desktopicon startmenu"
+    if option_env!("RUSTDESK_APP_NAME") == Some("ProVdesk") {
+        INSTALL_WITHOUT_SHORTCUTS
+    } else {
+        "desktopicon startmenu"
+    }
 }
 
 // This function return Option<String>, because some registry value may be empty.
@@ -1594,6 +1630,65 @@ fn get_after_install(
         provdesk_uri_cleanup=get_provdesk_uri_cleanup())
 }
 
+fn install_shortcut_commands(
+    app_name: &str,
+    exe: &str,
+    icon: Option<&str>,
+    options: &str,
+    start_menu: &str,
+    path: &str,
+    tmp_path: &str,
+) -> ResultType<String> {
+    if options == INSTALL_WITHOUT_SHORTCUTS {
+        return Ok(String::new());
+    }
+    let mk_shortcut_commands = embedded_shortcut_commands(
+        shortcut_bytes(exe, None, icon)?,
+        &format!("{app_name}.lnk"),
+        "mk_shortcut",
+    );
+    let uninstall_shortcut_commands = embedded_shortcut_commands(
+        shortcut_bytes(exe, Some("--uninstall"), Some("msiexec.exe"))?,
+        &format!("Uninstall {app_name}.lnk"),
+        "uninstall_shortcut",
+    );
+    let tray_shortcut_commands = embedded_tray_shortcut_commands(app_name, exe, icon)?;
+    let mut shortcuts = Default::default();
+    if options.contains("desktopicon") {
+        shortcuts = format!(
+            "copy /Y \"{}\\{}.lnk\" \"%PUBLIC%\\Desktop\\\"",
+            tmp_path, app_name
+        );
+    }
+    if options.contains("startmenu") {
+        shortcuts = format!(
+            "{shortcuts}
+md \"{start_menu}\"
+copy /Y \"{tmp_path}\\{app_name}.lnk\" \"{start_menu}\\\"
+copy /Y \"{tmp_path}\\Uninstall {app_name}.lnk\" \"{start_menu}\\\"
+     "
+        );
+    }
+
+    let tray_shortcuts = if config::is_outgoing_only() {
+        "".to_owned()
+    } else {
+        format!("
+{tray_shortcut_commands}
+copy /Y \"{tmp_path}\\{app_name} Tray.lnk\" \"%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\\"
+")
+    };
+    Ok(format!(
+        "
+{mk_shortcut_commands}
+{uninstall_shortcut_commands}
+{tray_shortcuts}
+{shortcuts}
+copy /Y \"{tmp_path}\\Uninstall {app_name}.lnk\" \"{path}\\\"
+"
+    ))
+}
+
 pub fn install_me(options: &str, path: String, silent: bool, debug: bool) -> ResultType<()> {
     // MSI and EXE installations use different registry layouts, so MSI-to-EXE upgrades are not supported.
     let (installed_subkey, _, _, _) = get_install_info();
@@ -1645,40 +1740,9 @@ pub fn install_me(options: &str, path: String, silent: bool, debug: bool) -> Res
     // The elevated runner expands this to `%~f0.dir`, beside its protected copy.
     // Do not stage privileged shortcut artifacts in the user-writable `%TEMP%`.
     let tmp_path = "%RUSTDESK_OUTPUT_DIR%".to_owned();
-    let mk_shortcut_commands = embedded_shortcut_commands(
-        shortcut_bytes(&exe, None, shortcut_icon_location.as_deref())?,
-        &format!("{app_name}.lnk"),
-        "mk_shortcut",
-    );
-    let uninstall_shortcut_commands = embedded_shortcut_commands(
-        shortcut_bytes(&exe, Some("--uninstall"), Some("msiexec.exe"))?,
-        &format!("Uninstall {app_name}.lnk"),
-        "uninstall_shortcut",
-    );
-    let tray_shortcut_commands =
-        embedded_tray_shortcut_commands(&app_name, &exe, shortcut_icon_location.as_deref())?;
-    let mut reg_value_desktop_shortcuts = "0".to_owned();
-    let mut reg_value_start_menu_shortcuts = "0".to_owned();
-    let reg_value_printer = "0".to_owned();
-    let mut shortcuts = Default::default();
-    if options.contains("desktopicon") {
-        shortcuts = format!(
-            "copy /Y \"{}\\{}.lnk\" \"%PUBLIC%\\Desktop\\\"",
-            tmp_path,
-            crate::get_app_name()
-        );
-        reg_value_desktop_shortcuts = "1".to_owned();
-    }
-    if options.contains("startmenu") {
-        shortcuts = format!(
-            "{shortcuts}
-md \"{start_menu}\"
-copy /Y \"{tmp_path}\\{app_name}.lnk\" \"{start_menu}\\\"
-copy /Y \"{tmp_path}\\Uninstall {app_name}.lnk\" \"{start_menu}\\\"
-     "
-        );
-        reg_value_start_menu_shortcuts = "1".to_owned();
-    }
+    let shortcut_commands = install_shortcut_commands(
+        &app_name, &exe, shortcut_icon_location.as_deref(), options, &start_menu, &path, &tmp_path,
+    )?;
 
     let meta = std::fs::symlink_metadata(&current_exe)?;
     let mut size = meta.len() / 1024;
@@ -1706,15 +1770,6 @@ if exist \"{tmp_path}\\{app_name} Tray.lnk\" del /f /q \"{tmp_path}\\{app_name} 
         Config::set_option("custom-rendezvous-server".into(), lic.host);
         Config::set_option("api-server".into(), lic.api);
     }
-
-    let tray_shortcuts = if config::is_outgoing_only() {
-        "".to_owned()
-    } else {
-        format!("
-{tray_shortcut_commands}
-copy /Y \"{tmp_path}\\{app_name} Tray.lnk\" \"%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\\"
-")
-    };
 
     // Keep removal of an existing queue when upgrading from a version with remote printing.
     let install_remote_printer = if is_win_10_or_greater() {
@@ -1747,11 +1802,7 @@ reg add {subkey} /f /v VersionBuild /t REG_DWORD /d {version_build}
 reg add {subkey} /f /v UninstallString /t REG_SZ /d \"\\\"{nested_exe}\\\" --uninstall\"
 reg add {subkey} /f /v EstimatedSize /t REG_DWORD /d {size}
 reg add {subkey} /f /v WindowsInstaller /t REG_DWORD /d 0
-{mk_shortcut_commands}
-{uninstall_shortcut_commands}
-{tray_shortcuts}
-{shortcuts}
-copy /Y \"{tmp_path}\\Uninstall {app_name}.lnk\" \"{path}\\\"
+{shortcut_commands}
 {dels}
 {import_config}
 {after_install}
@@ -1765,9 +1816,9 @@ copy /Y \"{tmp_path}\\Uninstall {app_name}.lnk\" \"{path}\\\"
         build_date = crate::BUILD_DATE,
         after_install = get_after_install(
             &exe,
-            Some(reg_value_start_menu_shortcuts),
-            Some(reg_value_desktop_shortcuts),
-            Some(reg_value_printer)
+            Some(u8::from(options.contains("startmenu")).to_string()),
+            Some(u8::from(options.contains("desktopicon")).to_string()),
+            Some("0".to_owned())
         ),
         sleep = if debug { "timeout 300" } else { "" },
         dels = if debug { "" } else { &dels },
@@ -3254,15 +3305,21 @@ fn get_install_service_commands(path: &str, exe: &str) -> ResultType<String> {
     if let Some(icon) = shortcut_icon_location.as_deref() {
         validate_install_value(icon)?;
     }
-    let tray_shortcut_commands =
-        embedded_tray_shortcut_commands(&app_name, exe, shortcut_icon_location.as_deref())?;
+    let shortcuts_disabled = option_env!("RUSTDESK_APP_NAME") == Some("ProVdesk")
+        && [REG_NAME_INSTALL_DESKTOPSHORTCUTS, REG_NAME_INSTALL_STARTMENUSHORTCUTS]
+            .iter().all(|name| get_reg_of_hkcr(".provdesk", name).as_deref() == Some("0"));
+    let tray_install = if shortcuts_disabled {
+        String::new()
+    } else {
+        let commands = embedded_tray_shortcut_commands(&app_name, exe, shortcut_icon_location.as_deref())?;
+        format!("{commands}\ncopy /Y \"%RUSTDESK_OUTPUT_DIR%\\{app_name} Tray.lnk\" \"%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\\"")
+    };
     let filter = format!(" /FI \"PID ne {}\"", get_current_pid());
     Ok(format!(
         "
 chcp 65001
 taskkill /F /IM {app_name}.exe{filter}
-{tray_shortcut_commands}
-copy /Y \"%RUSTDESK_OUTPUT_DIR%\\{app_name} Tray.lnk\" \"%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\\"
+{tray_install}
 {import_config}
 {create_service}
     ",
@@ -4694,6 +4751,17 @@ pub(super) fn get_pids_with_first_arg_by_wmic<S1: AsRef<str>, S2: AsRef<str>>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn provdesk_silent_install_emits_no_shortcuts() {
+        if option_env!("RUSTDESK_APP_NAME") == Some("ProVdesk") {
+            let commands = install_shortcut_commands(
+                "ProVdesk", r"C:\Program Files\ProVdesk\ProVdesk.exe", None,
+                get_silent_install_options(None), "Start Menu", "Install", "Temp",
+            ).unwrap();
+            assert!(commands.is_empty());
+        }
+    }
 
     // Test-only reusable Win32 HANDLE RAII helper.
     // If a future non-test path needs the same pattern, move it out of this test module.

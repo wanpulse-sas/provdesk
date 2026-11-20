@@ -934,6 +934,15 @@ async fn handle(data: Data, stream: &mut Connection) {
         Data::Config((name, value)) => match value {
             None => {
                 let value;
+                #[cfg(windows)]
+                if name == "provdesk-service-id"
+                    && option_env!("RUSTDESK_APP_NAME") == Some("ProVdesk")
+                    && crate::platform::is_root()
+                {
+                    let id = Config::get_id();
+                    allow_err!(stream.send(&Data::Config((name, Some(id)))).await);
+                    return;
+                }
                 if name == "id" {
                     value = Some(Config::get_id());
                 } else if name == "temporary-password" {
