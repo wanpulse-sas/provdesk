@@ -18,14 +18,15 @@ try {
     Set-Content "$fixture/ProVdesk.exe" 'signed fixture'
     $hash = (Get-FileHash "$fixture/ProVdesk.exe").Hash
     Set-Content "$fixture/ProVdesk.exe.sha256" "$hash  ProVdesk.exe"
-    @{ Version = '1.5.0'; SourceCommit = $env:BITBUCKET_COMMIT; PipelineCommit = $env:BITBUCKET_COMMIT;
-        BuildNumber = '19'; FinalSHA256 = $hash } | ConvertTo-Json | Set-Content "$fixture/build.json"
+    $fixtureManifest = @{ Version = '1.5.0.19'; SourceCommit = $env:BITBUCKET_COMMIT; PipelineCommit = $env:BITBUCKET_COMMIT;
+        BuildNumber = '19'; FinalSHA256 = $hash }
+    $fixtureManifest | ConvertTo-Json | Set-Content "$fixture/build.json"
     Set-Content "$fixture/THIRD-PARTY.txt" 'notices fixture'
     function Assert-Signature([string]$FilePath) {
         if ($script:mode -eq 'invalid-signature') { throw 'Invalid fixture signature.' }
         $script:signatureChecked = $true
     }
-    function Get-InstallerVersion([string]$FilePath) { return '1.5.0' }
+    function Get-InstallerVersion([string]$FilePath) { return $fixtureManifest.Version }
     function Get-Command { return @{ Source = 'Invoke-FixtureGit' } }
     function Invoke-FixtureGit {
         if (-not $script:signatureChecked) { throw 'Synchronization before signature verification.' }
@@ -52,10 +53,11 @@ try {
             if (-not $script:signatureChecked) { throw 'Unsigned upload attempted.' }
             if ($script:remoteCommit -ne $env:BITBUCKET_COMMIT) { throw 'Release before synchronization.' }
             $script:tagCommit = ($Arguments | Where-Object { $_ -like 'sha=*' }).Substring(4)
-            if ('ref=refs/tags/provdesk-1.5.0-build.19' -notin $Arguments) { throw 'Incorrect release tag.' }
+            if ('ref=refs/tags/provdesk-1.5.0.19' -notin $Arguments) { throw 'Incorrect release tag.' }
             return '{}'
         }
         if ($command -eq 'release create') {
+            if ($Arguments[2] -cne 'provdesk-1.5.0.19') { throw 'Incorrect release tag_name.' }
             $script:draft = $true
             $script:assets = @($Arguments | Where-Object { $_ -like "$fixture*" -and $_ -notlike '*release-notes.md' } | ForEach-Object {
                 @{ name = [IO.Path]::GetFileName($_); state = 'uploaded'; digest = 'sha256:' + (Get-FileHash $_).Hash.ToLowerInvariant() }
@@ -85,13 +87,28 @@ try {
             if ($failed -or -not $script:pushAttempted -or -not $script:published -or $script:draft -or $script:tagCommit -ne $env:BITBUCKET_COMMIT) {
                 throw 'Signed release was not published for the built commit.'
             }
-            if (($script:assets.name | Sort-Object) -join ',' -cne 'build.json,ProVdesk-1.5.0-windows-x86_64.exe,ProVdesk-1.5.0-windows-x86_64.exe.sha256,THIRD-PARTY.txt') {
+            if (($script:assets.name | Sort-Object) -join ',' -cne 'build.json,ProVdesk-1.5.0.19-windows-x86_64.exe,ProVdesk-1.5.0.19-windows-x86_64.exe.sha256,THIRD-PARTY.txt') {
                 throw 'Unexpected release assets.'
             }
         } elseif (-not $failed -or $script:published) { throw 'Invalid release was published.' }
         if ($script:mode -eq 'invalid-signature' -and ($script:pushAttempted -or $script:tagCommit)) { throw 'Invalid signature changed the remote.' }
         if ($script:mode -like 'sync-*' -and (-not $script:pushAttempted -or $script:tagCommit)) { throw 'Failed synchronization did not block release creation.' }
         if ($script:mode -eq 'asset-mismatch' -and -not $script:draft) { throw 'Failed upload did not remain a draft.' }
+    }
+    $script:mode = 'success'
+    foreach ($invalidVersion in @('1.5.19', '1.5.0.0.19', '1.5.x.19', '1.5.0.18')) {
+        $fixtureManifest.Version = $invalidVersion
+        $fixtureManifest | ConvertTo-Json | Set-Content "$fixture/build.json"
+        $script:pushAttempted = $false
+        $script:tagCommit = ''
+        $failed = $false
+        try { Publish-SignedGitHubRelease $fixture } catch {
+            if ($_.Exception.Message -notlike 'Expected a four-part product version*') { throw }
+            $failed = $true
+        }
+        if (-not $failed -or $script:pushAttempted -or $script:tagCommit) {
+            throw "Expected version $invalidVersion to be rejected before synchronization."
+        }
     }
     Write-Host 'Signed build synchronization, push refusal, remote verification and release checks passed (offline fixtures).'
 } finally {

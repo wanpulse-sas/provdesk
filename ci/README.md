@@ -317,7 +317,7 @@ failure does not roll back GitHub: its commit has already passed build and signa
 
 `Publish-GitHubRelease.ps1` reuses the existing WanPulse SAS signature checks, verifies
 the installer version, SHA-256 and current build manifest, and creates a tag
-`provdesk-<version>-build.<Bitbucket build number>` at the exact built commit.
+`provdesk-<major>.<minor>.<patch>.<Bitbucket build number>` at the exact built commit.
 A draft release receives only:
 
 - `ProVdesk-<version>-windows-x86_64.exe`: the same signed bytes as `out/ProVdesk.exe`;

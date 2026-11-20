@@ -329,7 +329,7 @@ de release ou de sauvegarde SMB ne fait pas reculer GitHub : son commit a déjà
 
 `Publish-GitHubRelease.ps1` réutilise les contrôles de signature de WanPulse SAS existants,
 vérifie la version, le SHA-256 et le manifeste du build courant, puis crée le tag
-`provdesk-<version>-build.<numéro de build Bitbucket>` sur le commit exact construit.
+`provdesk-<majeur>.<mineur>.<correctif>.<numéro de build Bitbucket>` sur le commit exact construit.
 Une release brouillon reçoit uniquement :
 
 - `ProVdesk-<version>-windows-x86_64.exe` : les mêmes octets signés que `out/ProVdesk.exe` ;

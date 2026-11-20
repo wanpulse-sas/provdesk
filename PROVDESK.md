@@ -96,7 +96,7 @@ There is no publication parameter. GitHub and SMB preflight checks run only on `
 
 The GitHub release contains `ProVdesk-<version>-windows-x86_64.exe`, its `.sha256`
 and `build.json`. Renaming preserves the signed executable bytes.
-Its tag, `provdesk-<version>-build.<number>`, points to the exact built commit.
+Its tag, `provdesk-<major>.<minor>.<patch>.<build>`, points to the exact built commit.
 The pipeline verifies the signed installer and uploaded asset hashes before
 publishing the draft release; it then publishes the same installer to SMB.
 

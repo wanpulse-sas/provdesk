@@ -1689,7 +1689,21 @@ copy /Y \"{tmp_path}\\Uninstall {app_name}.lnk\" \"{path}\\\"
     ))
 }
 
+fn installed_display_version(build_number: Option<&str>) -> ResultType<String> {
+    let Some(build_number) = build_number else {
+        return Ok(crate::VERSION.replace('-', "."));
+    };
+    let build = build_number.parse::<u16>()?;
+    Ok(format!(
+        "{}.{}.{}.{build}",
+        env!("CARGO_PKG_VERSION_MAJOR"),
+        env!("CARGO_PKG_VERSION_MINOR"),
+        env!("CARGO_PKG_VERSION_PATCH"),
+    ))
+}
+
 pub fn install_me(options: &str, path: String, silent: bool, debug: bool) -> ResultType<()> {
+    let version = installed_display_version(option_env!("BITBUCKET_BUILD_NUMBER"))?;
     // MSI and EXE installations use different registry layouts, so MSI-to-EXE upgrades are not supported.
     let (installed_subkey, _, _, _) = get_install_info();
     if get_windows_installer_state(&installed_subkey)? == Some(true) {
@@ -1812,7 +1826,6 @@ reg add {subkey} /f /v WindowsInstaller /t REG_DWORD /d 0
         display_icon = shortcut_icon_location.as_deref().unwrap_or(exe.as_str()),
         editor_name = EDITOR_NAME,
         nested_exe = escape_nested_cmd_ampersands(&exe),
-        version = crate::VERSION.replace("-", "."),
         build_date = crate::BUILD_DATE,
         after_install = get_after_install(
             &exe,
@@ -3391,6 +3404,7 @@ fn get_directory_size_kb(path: &str) -> u64 {
 }
 
 pub fn update_me(debug: bool) -> ResultType<()> {
+    let version = installed_display_version(option_env!("BITBUCKET_BUILD_NUMBER"))?;
     let app_name = crate::get_app_name();
     let src_exe = std::env::current_exe()?.to_string_lossy().to_string();
     let (subkey, path, _, exe) = get_install_info();
@@ -3444,7 +3458,6 @@ pub fn update_me(debug: bool) -> ResultType<()> {
     if versions.len() > 2 {
         version_build = versions[2];
     }
-    let version = crate::VERSION.replace("-", ".");
     let size = get_directory_size_kb(&path);
     let build_date = crate::BUILD_DATE;
     // Use the icon in the previous installation directory if possible.
@@ -4751,6 +4764,16 @@ pub(super) fn get_pids_with_first_arg_by_wmic<S1: AsRef<str>, S2: AsRef<str>>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn installed_display_version_uses_the_bitbucket_build_when_present() {
+        let expected = concat!(
+            env!("CARGO_PKG_VERSION_MAJOR"), ".", env!("CARGO_PKG_VERSION_MINOR"), ".",
+            env!("CARGO_PKG_VERSION_PATCH"), ".42"
+        );
+        assert_eq!(installed_display_version(Some("42")).unwrap(), expected);
+        assert_eq!(installed_display_version(None).unwrap(), crate::VERSION.replace('-', "."));
+    }
 
     #[test]
     fn provdesk_silent_install_emits_no_shortcuts() {

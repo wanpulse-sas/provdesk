@@ -79,11 +79,14 @@ function Publish-SignedGitHubRelease([string]$OutputDirectory) {
     if ($hash -ne $manifest.FinalSHA256 -or (Get-InstallerVersion $installer) -cne $manifest.Version) {
         throw 'The signed installer does not match its build manifest.'
     }
+    if ($manifest.Version -notmatch '\A(?:[0-9]+\.){3}([0-9]+)\z' -or $Matches[1] -cne $env:BITBUCKET_BUILD_NUMBER) {
+        throw "Expected a four-part product version ending in Bitbucket build $env:BITBUCKET_BUILD_NUMBER, got '$($manifest.Version)'."
+    }
     if ((Get-Content -LiteralPath "$installer.sha256" -Raw).Trim() -cne "$hash  ProVdesk.exe") {
         throw 'The installer checksum file does not match the signed executable.'
     }
     $repository = Get-GitHubReleaseRepository
-    $tag = "provdesk-$($manifest.Version)-build.$($manifest.BuildNumber)"
+    $tag = "provdesk-$($manifest.Version)"
     $directory = New-Item -ItemType Directory -Path "$OutputDirectory/github-release" -Force
     $assetName = "ProVdesk-$($manifest.Version)-windows-x86_64.exe"
     $releaseExe = Join-Path $directory.FullName $assetName
