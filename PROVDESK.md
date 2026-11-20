@@ -24,10 +24,21 @@ API URL and server public key are configured normally at runtime; this build
 contains no embedded values for those settings. Domain endpoints use secure
 WebSocket (`wss://`) even when the API URL is empty.
 
+## Silent Windows installation
+
+Run `ProVdesk.exe --silent-install`. The branded EXE skips desktop, Start Menu,
+Startup tray and installation-directory uninstall shortcuts. Windows Installed
+apps continues to invoke the installed executable with `--uninstall` through
+the uninstall registry entry.
+
 ## Fresh device identity
 
 When neither a plain nor an encrypted previous ID exists, ProVdesk creates a
 15-character random ID: an ASCII letter followed by 14 ASCII letters or digits.
+Installed Windows clients share the service identity with `--get-id`. Inventory
+running as SYSTEM can initialize it while the service is stopped. The first
+writer saves the ID before returning it; concurrent readers reuse that ID.
+If the service identity is inaccessible, the command reports an error.
 Existing IDs and key pairs are preserved. There is no post-registration rename.
 
 A fresh identity can use two replacement IDs if initial registration returns

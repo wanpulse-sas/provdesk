@@ -451,6 +451,17 @@ pub fn core_main() -> Option<Vec<String>> {
             }
             return None;
         } else if args[0] == "--get-id" {
+            #[cfg(windows)]
+            if option_env!("RUSTDESK_APP_NAME") == Some("ProVdesk") && crate::platform::is_installed() {
+                match crate::platform::windows::installed_provdesk_id() {
+                    Ok(id) => println!("{id}"),
+                    Err(err) => {
+                        eprintln!("Unable to read the installed ProVdesk ID: {err}");
+                        std::process::exit(1);
+                    }
+                }
+                return None;
+            }
             println!("{}", crate::ipc::get_id());
             return None;
         } else if args[0] == "--set-id" {
