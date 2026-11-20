@@ -127,7 +127,7 @@ The checksum file and build.json provide download verification and build provena
     $null = Invoke-GitHubCli -Arguments @('api', "repos/$repository/git/refs", '--hostname', 'github.com',
         '--method', 'POST', '--raw-field', "ref=refs/tags/$tag", '--raw-field', "sha=$($manifest.SourceCommit)")
     $null = Invoke-GitHubCli -Arguments (@('release', 'create', $tag, '--repo', "github.com/$repository",
-        '--verify-tag', '--draft', '--title', "ProVdesk $($manifest.Version) (build $($manifest.BuildNumber))",
+        '--verify-tag', '--draft', '--title', "ProVdesk $($manifest.Version)",
         '--notes-file', $notesPath) + $files)
     $release = Invoke-GitHubCli -Arguments @('release', 'view', $tag, '--repo', "github.com/$repository", '--json', 'databaseId') | ConvertFrom-Json
     $endpoint = "repos/$repository/releases/$($release.databaseId)"

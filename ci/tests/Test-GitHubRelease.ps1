@@ -58,6 +58,8 @@ try {
         }
         if ($command -eq 'release create') {
             if ($Arguments[2] -cne 'provdesk-1.5.0.19') { throw 'Incorrect release tag_name.' }
+            $titleIndex = [array]::IndexOf($Arguments, '--title')
+            if ($titleIndex -lt 0 -or $Arguments[$titleIndex + 1] -cne 'ProVdesk 1.5.0.19') { throw 'Incorrect release title.' }
             $script:draft = $true
             $script:assets = @($Arguments | Where-Object { $_ -like "$fixture*" -and $_ -notlike '*release-notes.md' } | ForEach-Object {
                 @{ name = [IO.Path]::GetFileName($_); state = 'uploaded'; digest = 'sha256:' + (Get-FileHash $_).Hash.ToLowerInvariant() }
