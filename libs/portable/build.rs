@@ -31,8 +31,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     | (u64::from(minor) << 32)
                     | (u64::from(patch) << 16)
                     | u64::from(build);
+                let version_string = format!("{major}.{minor}.{patch}.{build}");
                 res.set_version_info(winres::VersionInfo::FILEVERSION, version)
-                    .set("FileVersion", &format!("{major}.{minor}.{patch}.{build}"));
+                    .set_version_info(winres::VersionInfo::PRODUCTVERSION, version)
+                    .set("FileVersion", &version_string)
+                    .set("ProductVersion", &version_string);
             }
             Err(std::env::VarError::NotPresent) => {}
             Err(error) => return Err(error.into()),
